@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["bun"]
+  },
+  "include": [
+    "packages/*/tests/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "packages/*/test/**/*.tsx",
+    "packages/*/test-server/**/*.ts",
+    "packages/*/benchmarks/**/*.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts",
+    "scripts/check-packages.ts"
+  ]
+}

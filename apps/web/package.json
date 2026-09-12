@@ -10,6 +10,9 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@cmdflow/core": "workspace:*",
+    "@cmdflow/dom": "workspace:*",
+    "@cmdflow/react": "workspace:*",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"

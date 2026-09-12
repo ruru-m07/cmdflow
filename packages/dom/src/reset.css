@@ -1,0 +1,37 @@
+@layer cmdflow-reset {
+  :where([data-cmdflow-root]),
+  :where([data-cmdflow-root]) * {
+    box-sizing: border-box;
+  }
+
+  :where([data-cmdflow-root]) :where(input, button, textarea, select) {
+    font: inherit;
+    color: inherit;
+  }
+
+  :where([data-cmdflow-root]) :where(button) {
+    cursor: pointer;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="item"]) {
+    cursor: default;
+  }
+
+  :where([data-cmdflow-root]) :where([data-disabled="true"]) {
+    cursor: not-allowed;
+  }
+
+  :where([data-cmdflow-root]) :where(:focus-visible) {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where([data-cmdflow-root]),
+    :where([data-cmdflow-root]) * {
+      animation-duration: 0.01ms;
+      transition-duration: 0.01ms;
+      scroll-behavior: auto;
+    }
+  }
+}

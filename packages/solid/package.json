@@ -1,7 +1,7 @@
 {
-  "name": "@cmdflow/react",
+  "name": "@cmdflow/solid",
   "version": "0.0.0",
-  "description": "Headless React primitives for product-grade action panels.",
+  "description": "Headless Solid primitives over the shared CmdFlow engine and DOM controller.",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "check-types": "tsc --noEmit",
-    "test": "bun test test"
+    "test": "bun test --conditions=browser ./test/adapter.test.ts && bun test ./test-server/ssr.test.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -28,20 +28,17 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ruru-m07/cmdflow.git",
-    "directory": "packages/react"
+    "directory": "packages/solid"
   },
   "dependencies": {
     "@cmdflow/core": "workspace:*",
     "@cmdflow/dom": "workspace:*"
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "solid-js": "^1.9.0"
   },
   "devDependencies": {
-    "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.5",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "solid-js": "1.9.15",
     "typescript": "7.0.2"
   }
 }

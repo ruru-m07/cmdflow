@@ -1,0 +1,67 @@
+@import "./reset.css";
+
+@layer cmdflow-preset {
+  :where([data-cmdflow-root]) {
+    --cmdflow-background: Canvas;
+    --cmdflow-foreground: CanvasText;
+    --cmdflow-border: color-mix(in srgb, CanvasText 20%, Canvas);
+    --cmdflow-active: color-mix(in srgb, Highlight 18%, Canvas);
+    color: var(--cmdflow-foreground);
+    background: var(--cmdflow-background);
+    font-family: system-ui, sans-serif;
+  }
+
+  :where(dialog[data-cmdflow-root]) {
+    width: min(36rem, calc(100vw - 2rem));
+    max-height: min(80dvh, 42rem);
+    padding: 1rem;
+    border: 1px solid var(--cmdflow-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 4rem #0003;
+  }
+
+  :where(dialog[data-cmdflow-root])::backdrop {
+    background: #0006;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="input"]) {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--cmdflow-border);
+    border-radius: 0.375rem;
+    background: transparent;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="list"]) {
+    max-height: 24rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block: 0.5rem;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="item"]) {
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.375rem;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="item"][data-state="active"]) {
+    background: var(--cmdflow-active);
+    outline: 1px solid transparent;
+  }
+
+  :where([data-cmdflow-root]) :where([data-disabled="true"]) {
+    opacity: 0.55;
+  }
+
+  :where([data-cmdflow-root]) :where([data-cmdflow-part="field"]) {
+    display: block;
+    width: 100%;
+    margin-block: 0.5rem;
+  }
+
+  @media (forced-colors: active) {
+    :where([data-cmdflow-root]) :where([data-cmdflow-part="item"][data-state="active"]) {
+      outline-color: Highlight;
+    }
+  }
+}
