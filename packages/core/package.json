@@ -1,6 +1,6 @@
 {
   "name": "@cmdflow/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Framework-agnostic state and behavior for headless action panels.",
   "type": "module",
   "sideEffects": false,
