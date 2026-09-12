@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "test": "bun test tests",
     "check-types": "tsc --noEmit"
   },
   "publishConfig": {

@@ -19,7 +19,9 @@ const paper = tegami({
   },
   packages: {
     "@cmdflow/core": { group: "cmdflow" },
+    "@cmdflow/dom": { group: "cmdflow" },
     "@cmdflow/react": { group: "cmdflow" },
+    "@cmdflow/solid": { group: "cmdflow" },
   },
   plugins: [
     github({

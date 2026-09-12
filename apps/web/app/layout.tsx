@@ -13,7 +13,8 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "Cmdflow",
-  description: "Headless action panels for React.",
+  description:
+    "A framework-neutral command engine with headless React and Solid adapters. Explore the interactive CmdFlow demo.",
 };
 
 export default function RootLayout({

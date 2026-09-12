@@ -1,0 +1,50 @@
+{
+  "name": "@cmdflow/dom",
+  "version": "0.0.0",
+  "description": "Browser interaction, accessibility, and optional styles for CmdFlow.",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist",
+    "src/reset.css",
+    "src/preset.css"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./persistence": {
+      "types": "./dist/persistence.d.ts",
+      "import": "./dist/persistence.js",
+      "default": "./dist/persistence.js"
+    },
+    "./reset.css": "./src/reset.css",
+    "./preset.css": "./src/preset.css"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "check-types": "tsc --noEmit",
+    "test": "bun test tests"
+  },
+  "dependencies": {
+    "@cmdflow/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ruru-m07/cmdflow.git",
+    "directory": "packages/dom"
+  }
+}
