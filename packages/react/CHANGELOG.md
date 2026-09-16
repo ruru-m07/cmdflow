@@ -1,9 +1,6 @@
----
-packages:
-  "group:cmdflow": minor
----
+## @cmdflow/react@0.1.0
 
-## Initial headless command-flow engine and adapters
+### Initial headless command-flow engine and adapters
 
 Introduce a framework-independent command registry and state engine with nested views,
 contextual action panels, guarded async sources, relevance-bounded learned ranking, and forms.

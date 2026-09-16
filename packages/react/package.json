@@ -1,6 +1,6 @@
 {
   "name": "@cmdflow/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Headless React primitives for product-grade action panels.",
   "type": "module",
   "sideEffects": false,

@@ -1,6 +1,6 @@
 {
   "name": "@cmdflow/solid",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Headless Solid primitives over the shared CmdFlow engine and DOM controller.",
   "type": "module",
   "sideEffects": false,

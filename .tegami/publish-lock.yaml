@@ -1,0 +1,32 @@
+core:changelogs:
+  - content: "---\npackages:\n  group:cmdflow:\n    type: minor\n---\n\n## Initial headless command-flow engine and adapters\n\nIntroduce a framework-independent command registry and state engine with nested views,\ncontextual action panels, guarded async sources, relevance-bounded learned ranking, and forms.\n\nAdd browser interaction bindings, optional scoped styles, fixed-height virtualization helpers,\nand opt-in IndexedDB ranking persistence with fingerprinted query keys. React and Solid primitives\nshare the same engine and DOM controller.\n\nThis is a pre-1.0 API. Read the implementation guide for supported contracts and outstanding\nbrowser, assistive-technology, and production-hardening gates before adoption.\n"
+    filename: headless-engine.md
+    v: 0.0.0
+core:packages:
+  - changelogIds:
+      - headless-engine.md
+    id: npm:@cmdflow/core
+    updated: true
+  - changelogIds:
+      - headless-engine.md
+    id: npm:@cmdflow/dom
+    updated: true
+  - changelogIds:
+      - headless-engine.md
+    id: npm:@cmdflow/solid
+    updated: true
+  - changelogIds:
+      - headless-engine.md
+    id: npm:@cmdflow/react
+    updated: true
+npm:packages:
+  - id: npm:@cmdflow/core
+  - id: npm:@cmdflow/dom
+  - id: npm:@cmdflow/solid
+  - id: npm:@cmdflow/react
+  - id: npm:web
+npm:mark-latest:
+  - id: npm:@cmdflow/core
+  - id: npm:@cmdflow/dom
+  - id: npm:@cmdflow/solid
+  - id: npm:@cmdflow/react

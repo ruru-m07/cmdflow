@@ -1,6 +1,6 @@
 {
   "name": "@cmdflow/dom",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Browser interaction, accessibility, and optional styles for CmdFlow.",
   "type": "module",
   "sideEffects": [

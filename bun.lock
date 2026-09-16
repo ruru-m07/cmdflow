@@ -35,14 +35,14 @@
     },
     "packages/core": {
       "name": "@cmdflow/core",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "typescript": "7.0.2",
       },
     },
     "packages/dom": {
       "name": "@cmdflow/dom",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@cmdflow/core": "workspace:*",
       },
@@ -52,7 +52,7 @@
     },
     "packages/react": {
       "name": "@cmdflow/react",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@cmdflow/core": "workspace:*",
         "@cmdflow/dom": "workspace:*",
@@ -70,7 +70,7 @@
     },
     "packages/solid": {
       "name": "@cmdflow/solid",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@cmdflow/core": "workspace:*",
         "@cmdflow/dom": "workspace:*",
