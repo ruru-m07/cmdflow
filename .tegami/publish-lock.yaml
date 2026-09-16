@@ -25,8 +25,3 @@ npm:packages:
   - id: npm:@cmdflow/solid
   - id: npm:@cmdflow/react
   - id: npm:web
-npm:mark-latest:
-  - id: npm:@cmdflow/core
-  - id: npm:@cmdflow/dom
-  - id: npm:@cmdflow/solid
-  - id: npm:@cmdflow/react
