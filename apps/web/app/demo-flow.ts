@@ -1,14 +1,24 @@
 import {
-  type ActionDefinition,
-  type CommandDefinition,
+  type CmdFlow,
+  type CmdFlowActionDefinition,
+  type CmdFlowCommandDefinition,
+  type CmdFlowResultSource,
+  type CmdFlowViewDefinition,
   createCmdFlow,
-  type ViewDefinition,
-} from "@cmdflow/core";
-import { createIndexedDBRankingStore } from "@cmdflow/dom/persistence";
+} from "@cmdflow/react";
+import { createIndexedDBRankingStore } from "@cmdflow/react/persistence";
 
 export interface DemoContext {
   notify(message: string): void;
 }
+
+export interface DemoFlow {
+  readonly flow: CmdFlow<DemoContext>;
+  readonly ranking: ReturnType<typeof createIndexedDBRankingStore>;
+  failNextRequest(): void;
+  destroy(): void;
+}
+
 const githubCommands = [
   ["home", "GitHub", "Workspace overview"],
   ["stats", "GitHub · My stats", "Contribution activity"],
@@ -21,6 +31,7 @@ const githubCommands = [
   ["stars", "GitHub · Starred repositories", "Your saved repositories"],
   ["repos", "GitHub · Browse repositories", "Recently visited"],
 ] as const;
+
 const pullRequests = [
   "Preserve search when navigating back",
   "Add contextual action shortcuts",
@@ -39,6 +50,7 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
       reject(signal.reason);
       return;
     }
+
     const onAbort = () => {
       clearTimeout(timer);
       reject(signal.reason);
@@ -47,11 +59,12 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
       signal.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
+
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-function createForm(): ViewDefinition<DemoContext> {
+function createPullRequestForm(): CmdFlowViewDefinition<DemoContext> {
   return {
     id: "create-pr",
     type: "form",
@@ -60,6 +73,7 @@ function createForm(): ViewDefinition<DemoContext> {
     fields: [
       {
         id: "title",
+        type: "text",
         label: "Title",
         required: true,
         validate: (value) =>
@@ -81,6 +95,7 @@ function createForm(): ViewDefinition<DemoContext> {
       { id: "draft", label: "Create as draft", type: "checkbox", defaultValue: true },
     ],
     submit: {
+      type: "run",
       id: "create",
       title: "Create pull request",
       run: async ({ values, appContext, signal }) => {
@@ -92,7 +107,7 @@ function createForm(): ViewDefinition<DemoContext> {
   };
 }
 
-function pullRequestView(): ViewDefinition<DemoContext> {
+function createPullRequestList(): CmdFlowViewDefinition<DemoContext> {
   return {
     id: "pull-requests",
     type: "list",
@@ -103,157 +118,205 @@ function pullRequestView(): ViewDefinition<DemoContext> {
   };
 }
 
-export function createDemoFlow(notify: (message: string) => void) {
+function createPullRequestDetail(title: string, index: number): CmdFlowViewDefinition<DemoContext> {
+  return {
+    id: `pr-${index}`,
+    type: "detail",
+    title,
+    description:
+      "This local fixture shows how a command can open a richer view. Escape returns to the exact list, query, and active item.",
+    actions: [
+      {
+        type: "run",
+        id: "review",
+        title: "Mark reviewed",
+        run: ({ appContext }) => {
+          appContext.notify(`Reviewed: ${title}`);
+          return { type: "pop-view", target: "main" };
+        },
+      },
+    ],
+  };
+}
+
+function createPrimaryAction(id: string, title: string): CmdFlowActionDefinition<DemoContext> {
+  if (id === "create") {
+    return {
+      type: "view",
+      id: "open",
+      title: "Create pull request",
+      priority: "primary",
+      target: "main",
+      view: createPullRequestForm(),
+    };
+  }
+
+  if (id === "pulls" || id === "search") {
+    return {
+      type: "view",
+      id: "open",
+      title: "Browse pull requests",
+      priority: "primary",
+      target: "main",
+      view: createPullRequestList(),
+    };
+  }
+
+  return {
+    type: "run",
+    id: "open",
+    title: "Open command",
+    priority: "primary",
+    run: ({ appContext }) => {
+      appContext.notify(`Ran ${title}. This successful choice is remembered locally.`);
+      return { type: "close" };
+    },
+  };
+}
+
+function createContextualActions(
+  id: string,
+  title: string,
+): readonly CmdFlowActionDefinition<DemoContext>[] {
+  return [
+    {
+      type: "run",
+      id: "copy",
+      title: "Copy demo URL",
+      priority: "secondary",
+      shortcut: { key: "c", mod: true, shift: true },
+      learn: false,
+      run: async ({ appContext }) => {
+        if (!navigator.clipboard)
+          throw new Error("Clipboard access is unavailable in this browser.");
+        await navigator.clipboard.writeText(`https://github.com/cmdflow/${id}`);
+        appContext.notify("Copied the demo URL.");
+        return { type: "close", target: "actions" };
+      },
+    },
+    {
+      type: "submenu",
+      id: "organize",
+      title: "Organize…",
+      actions: [
+        {
+          type: "run",
+          id: "pin",
+          title: "Preview pin action",
+          run: ({ appContext }) => {
+            appContext.notify(`Pin action selected for ${title}.`);
+            return { type: "close", target: "actions" };
+          },
+        },
+        {
+          type: "view",
+          id: "create",
+          title: "Create a related pull request",
+          target: "main",
+          view: createPullRequestForm(),
+        },
+      ],
+    },
+    {
+      type: "run",
+      id: "delete",
+      title: "Preview removal",
+      destructive: true,
+      learn: false,
+      run: ({ appContext }) => {
+        appContext.notify(`Confirmed the demo removal action for ${title}.`);
+        return { type: "close", target: "actions" };
+      },
+    },
+    {
+      type: "run",
+      id: "admin",
+      title: "Repository settings",
+      enabled: () => ({ reason: "Admin permission is required in this demo." }),
+      run: () => {},
+    },
+  ];
+}
+
+function createCommands(): readonly CmdFlowCommandDefinition<DemoContext>[] {
+  return githubCommands.map(([id, title, subtitle], index) => ({
+    id,
+    title,
+    subtitle,
+    providerRank: index,
+    keywords: ["github"],
+    aliases: ["github"],
+    action: createPrimaryAction(id, title),
+    actions: createContextualActions(id, title),
+  }));
+}
+
+export function createDemoFlow(notify: (message: string) => void): DemoFlow {
   const ranking = createIndexedDBRankingStore({
     databaseName: "cmdflow-demo-ranking-v1",
     queryRetention: "fingerprint",
   });
   let failNext = false;
-  const commands: CommandDefinition<DemoContext>[] = githubCommands.map(
-    ([id, title, subtitle], index) => {
-      const primary: ActionDefinition<DemoContext> = {
-        id: "open",
-        title: id === "create" ? "Create pull request" : "Open command",
-        priority: "primary",
-        run: ({ appContext }) => {
-          if (id === "create") return { type: "push-view", target: "main", view: createForm() };
-          if (id === "pulls" || id === "search")
-            return { type: "push-view", target: "main", view: pullRequestView() };
-          appContext.notify(`Ran ${title}. This successful choice is remembered locally.`);
-          return { type: "close" };
-        },
-      };
-      return {
-        id,
-        title,
-        subtitle,
-        providerRank: index,
-        keywords: ["github"],
-        aliases: ["github"],
-        actions: [
-          primary,
-          {
-            id: "copy",
-            title: "Copy demo URL",
-            priority: "secondary",
-            shortcut: { key: "c", mod: true, shift: true },
-            learn: false,
-            run: async ({ appContext }) => {
-              if (!navigator.clipboard)
-                throw new Error("Clipboard access is unavailable in this browser.");
-              await navigator.clipboard.writeText(`https://github.com/cmdflow/${id}`);
-              appContext.notify("Copied the demo URL.");
-              return { type: "close", target: "actions" };
+
+  const sources: readonly CmdFlowResultSource<DemoContext>[] = [
+    {
+      id: "pull-requests",
+      debounceMs: 120,
+      search: async ({ rawQuery, cursor, signal }) => {
+        await delay(450, signal);
+        if (failNext) {
+          failNext = false;
+          throw new Error("The demo source failed. Retry to recover.");
+        }
+
+        const matches = pullRequests
+          .map((title, index) => ({ title, index }))
+          .filter(({ title }) => title.toLowerCase().includes(rawQuery.toLowerCase()));
+        const start = Number(cursor ?? "0");
+        return {
+          operation: cursor ? "patch" : "replace",
+          done: true,
+          nextCursor: start + 3 < matches.length ? String(start + 3) : undefined,
+          items: matches.slice(start, start + 3).map(({ title, index }) => ({
+            id: String(index + 1),
+            title,
+            subtitle: `cmdflow/cmdflow · #${101 + index}`,
+            providerRank: index,
+            action: {
+              type: "view",
+              id: "open",
+              title: "Open pull request",
+              target: "main",
+              view: createPullRequestDetail(title, index),
             },
-          },
-          {
-            id: "organize",
-            title: "Organize…",
-            children: [
-              {
-                id: "pin",
-                title: "Preview pin action",
-                run: ({ appContext }) => {
-                  appContext.notify(`Pin action selected for ${title}.`);
-                  return { type: "close", target: "actions" };
-                },
-              },
-              {
-                id: "create",
-                title: "Create a related pull request",
-                run: () => ({ type: "push-view", target: "main", view: createForm() }),
-              },
-            ],
-          },
-          {
-            id: "delete",
-            title: "Preview removal",
-            destructive: true,
-            learn: false,
-            run: ({ appContext }) => {
-              appContext.notify(`Confirmed the demo removal action for ${title}.`);
-              return { type: "close", target: "actions" };
-            },
-          },
-          {
-            id: "admin",
-            title: "Repository settings",
-            enabled: () => ({ reason: "Admin permission is required in this demo." }),
-            run: () => {},
-          },
-        ],
-      };
+          })),
+        };
+      },
     },
-  );
-  const store = createCmdFlow<DemoContext>({
+  ];
+
+  const flow = createCmdFlow<DemoContext>({
     id: "cmdflow-demo",
     context: { notify },
     root: { id: "commands", type: "list", title: "Commands", sourceIds: [] },
-    commands,
+    commands: createCommands(),
     ranking: {
       store: ranking,
       scope: { subjectKey: "local-demo", surfaceId: "palette" },
       queryPolicy: (scope) => ranking.getQueryPolicy(scope),
     },
-    sources: [
-      {
-        id: "pull-requests",
-        debounceMs: 120,
-        search: async ({ rawQuery, cursor, signal }) => {
-          await delay(450, signal);
-          if (failNext) {
-            failNext = false;
-            throw new Error("The demo source failed. Retry to recover.");
-          }
-          const matches = pullRequests
-            .map((title, index) => ({ title, index }))
-            .filter(({ title }) => title.toLowerCase().includes(rawQuery.toLowerCase()));
-          const start = Number(cursor ?? "0");
-          return {
-            operation: cursor ? "patch" : "replace",
-            done: true,
-            nextCursor: start + 3 < matches.length ? String(start + 3) : undefined,
-            items: matches.slice(start, start + 3).map(({ title, index }) => ({
-              id: String(index + 1),
-              title,
-              subtitle: `cmdflow/cmdflow · #${101 + index}`,
-              providerRank: index,
-              run: () => ({
-                type: "push-view",
-                target: "main",
-                view: {
-                  id: `pr-${index}`,
-                  type: "detail",
-                  title,
-                  description:
-                    "This local fixture shows how a command can open a richer view. Escape returns to the exact list, query, and active item.",
-                  actions: [
-                    {
-                      id: "review",
-                      title: "Mark reviewed",
-                      run: ({ appContext }) => {
-                        appContext.notify(`Reviewed: ${title}`);
-                        return { type: "pop-view", target: "main" };
-                      },
-                    },
-                  ],
-                },
-              }),
-            })),
-          };
-        },
-      },
-    ],
+    sources,
   });
+
   return {
-    store,
+    flow,
     ranking,
     failNextRequest() {
       failNext = true;
-      store.refresh();
+      flow.refresh();
     },
     destroy() {
-      store.destroy();
+      flow.destroy();
       ranking.destroy();
     },
   };

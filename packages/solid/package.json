@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "description": "Headless Solid primitives over the shared CmdFlow engine and DOM controller.",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
-    "dist"
+    "dist",
+    "src/reset.css",
+    "src/preset.css"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,10 +18,17 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./persistence": {
+      "types": "./dist/persistence.d.ts",
+      "import": "./dist/persistence.js",
+      "default": "./dist/persistence.js"
+    },
+    "./reset.css": "./src/reset.css",
+    "./preset.css": "./src/preset.css"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "build": "bun ../../scripts/clean-package-dist.ts && tsc --project tsconfig.json",
     "check-types": "tsc --noEmit",
     "test": "bun test --conditions=browser ./test/adapter.test.ts && bun test ./test-server/ssr.test.ts"
   },

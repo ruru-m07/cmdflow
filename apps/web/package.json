@@ -10,17 +10,18 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@cmdflow/core": "workspace:*",
-    "@cmdflow/dom": "workspace:*",
     "@cmdflow/react": "workspace:*",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.3.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
+    "postcss": "8.5.28",
+    "tailwindcss": "4.3.3",
     "typescript": "7.0.2"
   }
 }

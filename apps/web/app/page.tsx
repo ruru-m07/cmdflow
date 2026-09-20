@@ -1,285 +1,226 @@
 "use client";
 
-import type { ResolvedItem } from "@cmdflow/core";
-import { Command, useCmdflow } from "@cmdflow/react";
+import { Command } from "@cmdflow/react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { createDemoFlow } from "./demo-flow";
-import styles from "./page.module.css";
+import { MINIMAL_REACT_SOURCE } from "./demo/source-example";
+import { createDemoFlow, type DemoFlow } from "./demo-flow";
+import { ExamplePalette } from "./example-palette";
 
-type Demo = ReturnType<typeof createDemoFlow>;
+const DOM_OPTIONS = { openShortcut: { key: "k", mod: true } } as const;
 
-function Result({ item }: { item: ResolvedItem }) {
-  return (
-    <Command.Item item={item} className={styles.item}>
-      <span className={styles.itemIcon} aria-hidden="true">
-        {item.sourceId === "pull-requests" ? "↗" : "⌘"}
-      </span>
-      <span className={styles.itemCopy}>
-        <span>{item.title}</span>
-        <small>{item.subtitle}</small>
-      </span>
-      <span className={styles.itemHint} aria-hidden="true">
-        ↵
-      </span>
-    </Command.Item>
-  );
-}
+const GUIDE_STEPS = [
+  {
+    number: "01",
+    title: "Search & Load",
+    description: "Open My Pull Requests to try async search, pagination, loading, and recovery.",
+  },
+  {
+    number: "02",
+    title: "Open Actions",
+    description: "Use Ctrl / ⌘ K on a result to browse nested actions and confirmation states.",
+  },
+  {
+    number: "03",
+    title: "Complete a Form",
+    description: "Choose Create Pull Request to try validation, submission, and draft protection.",
+  },
+] as const;
 
-function Palette({ demo }: { demo: Demo }) {
-  const { store, snapshot } = useCmdflow();
-  const frame = snapshot.current;
-  const actionFrame = snapshot.actionFrame;
-  const primary = frame.actions.find((action) => action.priority === "primary");
-  const source = frame.sources[0];
-  const execution = snapshot.executions.at(-1);
-  return (
-    <Command.Dialog className={styles.palette} aria-label="CmdFlow command palette">
-      <div className={styles.paletteHeader}>
-        {snapshot.main.length > 1 ? (
-          <Command.Back className={styles.back}>
-            ← <span>Back</span>
-          </Command.Back>
-        ) : (
-          <span className={styles.paletteBrand}>
-            ⌘ <span>CmdFlow</span>
-          </span>
-        )}
-        <span className={styles.viewTitle}>{frame.view.title}</span>
-        <Command.Close className={styles.close}>Esc</Command.Close>
-      </div>
-      {frame.view.type === "list" ? (
-        <>
-          <Command.Input
-            className={styles.search}
-            aria-label="Search commands"
-            placeholder={snapshot.main.length > 1 ? "Search pull requests…" : "Search for GitHub…"}
-          />
-          <div className={styles.listMeta}>
-            <span>{source ? "PULL REQUESTS" : "RESULTS"}</span>
-            <span>
-              {frame.items.length} {source?.status === "loading" ? "· Loading…" : ""}
-            </span>
-          </div>
-          <Command.List className={styles.list}>
-            {(item) => <Result key={item.candidateId} item={item} />}
-          </Command.List>
-          {source?.status === "error" ? (
-            <div className={styles.sourceNotice} role="alert">
-              <span>{source.error}</span>
-              <button type="button" onClick={() => store.refresh()}>
-                Retry source
-              </button>
-            </div>
-          ) : null}
-          {frame.items.length === 0 &&
-          source?.status !== "loading" &&
-          source?.status !== "error" ? (
-            <p className={styles.empty}>No commands found. Try another search.</p>
-          ) : null}
-          {source ? (
-            <div className={styles.sourceControls}>
-              <span>Local async fixture</span>
-              {source.nextCursor ? (
-                <button
-                  type="button"
-                  disabled={source.status === "loading"}
-                  onClick={() => {
-                    void store.loadMore(source.id);
-                  }}
-                >
-                  Load more
-                </button>
-              ) : null}
-              <button type="button" onClick={() => demo.failNextRequest()}>
-                Simulate error
-              </button>
-            </div>
-          ) : null}
-        </>
-      ) : frame.view.type === "form" ? (
-        <Command.Form className={styles.form}>
-          <h2>{frame.view.title}</h2>
-          <p>{frame.view.description}</p>
-          <div className={styles.field}>
-            <Command.FieldLabel fieldId="title" />
-            <Command.Field fieldId="title" placeholder="What does this change do?" />
-            <Command.FieldError fieldId="title" />
-          </div>
-          <div className={styles.field}>
-            <Command.FieldLabel fieldId="body" />
-            <Command.Textarea fieldId="body" rows={3} placeholder="Add some context…" />
-          </div>
-          <div className={styles.field}>
-            <Command.FieldLabel fieldId="base" />
-            <Command.Select fieldId="base" />
-          </div>
-          <Command.FieldLabel fieldId="draft" className={styles.checkbox}>
-            <Command.Field fieldId="draft" /> Create as draft
-          </Command.FieldLabel>
-          <div className={styles.formButtons}>
-            <Command.Back aria-label="Cancel">Cancel</Command.Back>
-            <button type="submit" disabled={frame.form.submitting}>
-              {frame.form.submitting ? "Creating…" : "Create pull request"}
-            </button>
-          </div>
-        </Command.Form>
-      ) : (
-        <article className={styles.detail}>
-          <span className={styles.detailIcon}>↗</span>
-          <h2>{frame.view.title}</h2>
-          <p>{frame.view.description}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void store.invoke({ address: { surface: "main", frameId: frame.id } });
-            }}
-          >
-            Mark reviewed
-          </button>
-        </article>
-      )}
-      {execution?.status === "error" ? (
-        <p className={styles.sourceNotice} role="alert">
-          {execution.error ?? "The action could not be completed."}
-        </p>
-      ) : null}
-      <div className={styles.paletteFooter}>
-        <span className={styles.footerHint}>
-          {snapshot.rankingReady ? "Learns from successful actions" : "Loading local preferences…"}
-        </span>
-        <div>
-          <span className={styles.primaryAction}>{primary?.title ?? "Navigate"}</span>
-          <kbd>↵</kbd>
-          <span className={styles.footerDivider} />
-          <Command.ActionsTrigger className={styles.actionsButton}>
-            Actions <kbd>⌘ K</kbd>
-          </Command.ActionsTrigger>
-        </div>
-      </div>
-      <Command.Actions className={styles.actions} aria-label="Contextual actions">
-        <div className={styles.actionsHeader}>
-          <Command.Back>←</Command.Back>
-          <span>{actionFrame?.view.title ?? "Actions"}</span>
-        </div>
-        <Command.Input
-          className={styles.actionSearch}
-          aria-label="Search actions"
-          placeholder="Search actions…"
-        />
-        <Command.List className={styles.actionList}>
-          {(item) => (
-            <Command.Item key={item.candidateId} item={item} className={styles.actionItem}>
-              <span>{item.title}</span>
-              {item.disabled ? <small>{item.disabledReason}</small> : null}
-            </Command.Item>
-          )}
-        </Command.List>
-      </Command.Actions>
-      <Command.Confirmation className={styles.confirmation}>
-        <h2>{snapshot.confirmation?.title}</h2>
-        <p>
-          {snapshot.confirmation?.kind === "discard"
-            ? "Your unsaved form changes will be discarded."
-            : "Confirm this demo action to continue."}
-        </p>
-        <div>
-          <Command.CancelConfirmation>Keep editing</Command.CancelConfirmation>
-          <Command.Confirm>Confirm</Command.Confirm>
-        </div>
-      </Command.Confirmation>
-      <Command.Status />
-    </Command.Dialog>
-  );
-}
+type CopyState = "idle" | "copied" | "unavailable";
 
 export default function Home() {
-  const [demo, setDemo] = useState<Demo | null>(null);
   const [activity, setActivity] = useState("Your command history stays in this browser.");
+  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [demo, setDemo] = useState<DemoFlow | null>(null);
+
   useEffect(() => {
     const instance = createDemoFlow(setActivity);
     setDemo(instance);
     return () => instance.destroy();
   }, []);
+
+  async function resetLearning() {
+    if (!demo) return;
+
+    try {
+      await demo.ranking.reset({
+        type: "surface",
+        subjectKey: "local-demo",
+        surfaceId: "palette",
+      });
+      setActivity("Cleared the locally learned command order.");
+    } catch {
+      setActivity("Learning could not be reset. Refresh the page and try again.");
+    }
+  }
+
+  async function copySource() {
+    try {
+      await navigator.clipboard.writeText(MINIMAL_REACT_SOURCE);
+      setCopyState("copied");
+      setActivity("Copied the React example to your clipboard.");
+    } catch {
+      setCopyState("unavailable");
+      setActivity("Clipboard access is unavailable. Use the GitHub link to copy the example.");
+    }
+  }
+
   return (
-    <main className={styles.page}>
-      <nav className={styles.nav}>
-        <a href="/" className={styles.logo}>
-          <span>⌘</span> cmdflow
-        </a>
-        <a href="https://github.com/ruru-m07/cmdflow">View source ↗</a>
-      </nav>
-      <section className={styles.hero}>
-        <div className={styles.eyebrow}>
-          <span /> HEADLESS. CONTEXTUAL. YOURS.
+    <div className="min-h-svh overflow-x-clip bg-canvas text-foreground selection:bg-foreground selection:text-canvas">
+      <a
+        href="#main-content"
+        className="fixed top-3 left-3 z-[100] -translate-y-20 rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-canvas focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        Skip to Content
+      </a>
+
+      <header className="border-b border-border pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex min-h-16 w-full max-w-5xl items-center justify-between gap-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] sm:px-6">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center gap-2.5 rounded-md font-semibold tracking-[-0.03em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:min-h-9"
+            aria-label="CmdFlow home"
+          >
+            <span
+              className="grid size-7 place-items-center rounded-md border border-border-strong bg-panel font-mono text-sm"
+              aria-hidden="true"
+            >
+              ⌘
+            </span>
+            <span translate="no">CmdFlow</span>
+          </Link>
+
+          <nav className="flex items-center gap-4 text-sm" aria-label="Primary navigation">
+            <span className="hidden font-mono text-xs text-muted sm:inline">v0.2</span>
+            <a
+              href="https://github.com/ruru-m07/cmdflow"
+              className="rounded-md text-muted underline decoration-border-strong underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub <span aria-hidden="true">↗</span>
+            </a>
+          </nav>
         </div>
-        <h1>
-          One panel.
-          <br />
-          <span>Every possibility.</span>
-        </h1>
-        <p>
-          A command interface that understands the next step. Search, navigate, act, and pick up
-          exactly where you left off.
-        </p>
-        {demo ? (
-          <Command.Root store={demo.store}>
-            <Command.Trigger className={styles.launch}>
-              Open command panel <kbd>⌘ K</kbd>
-            </Command.Trigger>
-            <Palette demo={demo} />
-          </Command.Root>
-        ) : (
-          <button type="button" disabled className={styles.launch}>
-            Preparing command panel…
-          </button>
-        )}
-        <span className={styles.hint}>Or press Ctrl / ⌘ K anywhere on this page</span>
-      </section>
-      <section className={styles.features} aria-label="Try the interaction model">
-        <article>
-          <span>01 / REMEMBERS</span>
-          <h2>Your next search gets smarter.</h2>
-          <p>
-            Search “GitHub”, choose Notifications, then reopen. Successful actions refine ranking
-            locally; highlighting does not.
+      </header>
+
+      <main id="main-content" className="scroll-mt-6" tabIndex={-1}>
+        <section
+          className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-20 pb-14 text-center sm:px-6 sm:pt-24 sm:pb-16"
+          aria-labelledby="page-title"
+        >
+          <p className="font-mono text-xs font-medium tracking-[0.14em] text-muted uppercase">
+            Headless Command Workflows
           </p>
-        </article>
-        <article>
-          <span>02 / GOES DEEPER</span>
-          <h2>Commands become workflows.</h2>
-          <p>
-            Open My pull requests for async results. Create a pull request for native inputs,
-            validation, and draft protection.
+          <h1
+            id="page-title"
+            className="mt-5 max-w-2xl text-balance text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl"
+          >
+            A Command Palette for Real Workflows
+          </h1>
+          <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-muted">
+            Search commands, open contextual actions, load async results, and complete forms through
+            one framework-neutral flow.
           </p>
-        </article>
-        <article>
-          <span>03 / STAYS IN CONTEXT</span>
-          <h2>More actions. Same place.</h2>
-          <p>
-            Press Ctrl / ⌘ K on a result. Search its actions, enter Organize, or open a related form
-            without losing your place.
+
+          <div className="mt-8" aria-busy={!demo}>
+            {demo ? (
+              <Command.Root flow={demo.flow} domOptions={DOM_OPTIONS}>
+                <Command.Trigger className="inline-flex min-h-12 touch-manipulation items-center justify-center gap-6 rounded-lg border border-foreground bg-foreground px-4 text-sm font-semibold text-canvas transition-transform duration-150 hover:bg-foreground/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transform-none motion-reduce:transition-none">
+                  Open Command Palette
+                  <kbd className="rounded border border-black/20 bg-black/10 px-1.5 py-0.5 font-mono text-[0.6875rem] [@media(pointer:coarse)]:hidden">
+                    Ctrl / ⌘&nbsp;K
+                  </kbd>
+                </Command.Trigger>
+                <ExamplePalette demo={demo} />
+              </Command.Root>
+            ) : (
+              <button
+                className="inline-flex min-h-12 items-center rounded-lg border border-border-strong bg-panel px-4 text-sm font-semibold text-muted"
+                type="button"
+                disabled
+              >
+                Preparing Command Palette…
+              </button>
+            )}
+          </div>
+          <p className="mt-3 text-pretty text-xs leading-5 text-muted">
+            No account or network request required.
+            <span className="hidden sm:inline"> Press Ctrl / ⌘&nbsp;K from anywhere.</span>
           </p>
-        </article>
-      </section>
-      <section className={styles.activity} aria-label="Demo activity">
-        <span className={styles.activityDot} />
-        <p role="status">{activity}</p>
-        {demo ? (
+        </section>
+
+        <section
+          className="mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-col gap-3 border-y border-border py-4 sm:w-[calc(100%-3rem)] sm:flex-row sm:items-center"
+          aria-label="Demo activity"
+        >
+          <span className="size-1.5 shrink-0 rounded-full bg-foreground" aria-hidden="true" />
+          <p
+            id="demo-status"
+            className="min-w-0 flex-1 text-pretty text-sm text-muted"
+            role="status"
+            aria-live="polite"
+          >
+            {activity}
+          </p>
           <button
             type="button"
-            onClick={async () => {
-              await demo.store.resetRanking();
-              setActivity("Local learned ranking has been reset.");
-            }}
+            className="min-h-11 self-start rounded-md px-2 text-xs font-medium text-muted underline decoration-border-strong underline-offset-4 hover:text-foreground active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:cursor-wait disabled:opacity-50 sm:min-h-9 sm:self-auto"
+            onClick={() => void resetLearning()}
+            disabled={!demo}
+            aria-describedby="demo-status"
           >
-            Reset learning
+            Reset Learning
           </button>
-        ) : null}
-      </section>
-      <footer className={styles.pageFooter}>
-        <span>Built with @cmdflow/core + @cmdflow/react</span>
-        <span>Local fixture data · No GitHub account needed</span>
+        </section>
+
+        <section
+          className="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6 sm:py-20"
+          aria-labelledby="guide-title"
+        >
+          <div className="mx-auto max-w-xl text-center">
+            <p className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Try the Demo</p>
+            <h2
+              id="guide-title"
+              className="mt-3 text-balance text-2xl font-semibold tracking-[-0.035em] sm:text-3xl"
+            >
+              Three Paths, One Surface
+            </h2>
+          </div>
+
+          <ol className="mt-10 grid border-y border-border md:grid-cols-3 md:divide-x md:divide-border">
+            {GUIDE_STEPS.map((step) => (
+              <li
+                key={step.number}
+                className="border-b border-border py-6 last:border-b-0 md:border-b-0 md:px-6 md:first:pl-0 md:last:pr-0"
+              >
+                <span className="font-mono text-xs tabular-nums text-muted">{step.number}</span>
+                <h3 className="mt-4 text-base font-semibold tracking-[-0.02em]">{step.title}</h3>
+                <p className="mt-2 text-pretty text-sm leading-6 text-muted">{step.description}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-xs text-muted [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span>Headless by default. Styled only when you choose.</span>
+          <button
+            type="button"
+            className="min-h-11 self-start rounded-md px-2 font-medium text-muted underline decoration-border-strong underline-offset-4 hover:text-foreground active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground sm:min-h-9 sm:self-auto"
+            onClick={() => void copySource()}
+            aria-describedby="demo-status"
+          >
+            {copyState === "copied"
+              ? "Copied"
+              : copyState === "unavailable"
+                ? "Try Copy Again"
+                : "Copy React Example"}
+          </button>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }

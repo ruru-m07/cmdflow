@@ -1,71 +1,89 @@
 # CmdFlow
 
-CmdFlow is a framework-agnostic engine with headless adapters for building product-grade action
-panels. It aims to provide the registration, state, search, learned ranking, navigation, and
-interaction primitives that sit behind command interfaces in products such as Raycast, GitHub,
-and Linear. Products keep control of their markup and styling through CmdFlow's behavioral
-bindings, accessible defaults, and optional styles.
+CmdFlow is the framework-neutral action workflow engine for product command interfaces. Define
+commands once, then compose search, nested navigation, contextual actions, forms, async sources,
+and local learned ranking with React, Solid, or the DOM directly.
 
-The proposed product model, package boundaries, accessibility contract, ranking design, and
-delivery roadmap live in [the architecture document](docs/architecture.md).
-See [implementation status](docs/implementation.md) for the current API, test evidence, and
-remaining release gates. The library is pre-release; the architecture examples are not API guarantees.
+This repository contains the v0.2 API described below. The currently published v0.1 packages still
+use the earlier low-level adapter contract; v0.2 has not been published yet.
 
-## Workspace
-
-- `apps/web` — the CmdFlow website and development surface
-- `packages/core` — framework-agnostic action-panel state and behavior
-- `packages/dom` — browser bindings, optional reset/preset CSS, and opt-in IndexedDB persistence
-- `packages/react` — headless React bindings published as `@cmdflow/react`
-- `packages/solid` — headless Solid bindings over the same engine and browser controller
-
-The repository uses Bun workspaces and Turborepo. Shared TypeScript defaults live in the root
-`tsconfig.json`; there is no configuration package.
-
-## Development
+## React quick start
 
 ```sh
-bun install
-bun run dev
+bun add @cmdflow/react
 ```
 
-Useful checks:
+```tsx
+import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
+import "@cmdflow/react/preset.css";
 
-```sh
-bun run check
-bun run check:fix
-bun run check-types
-bun run test
-bun run build
-bun run test:packages
-bunx playwright install chromium firefox webkit
-bun run test:e2e
-bun run bench
+const commands = [
+  {
+    id: "settings.open",
+    title: "Open settings",
+    action: {
+      type: "run",
+      id: "open",
+      title: "Open settings",
+      run: () => window.location.assign("/settings"),
+    },
+  },
+] satisfies readonly CmdFlowCommandDefinition[];
+
+export function AppCommands() {
+  return (
+    <Command.Root commands={commands}>
+      <Command.Trigger>Open commands</Command.Trigger>
+      <Command.Dialog aria-label="Application commands">
+        <Command.Input placeholder="Search commands…" />
+        <Command.List>
+          {(item) => <Command.Item key={item.candidateId} item={item} />}
+        </Command.List>
+        <Command.Empty>No commands found</Command.Empty>
+      </Command.Dialog>
+    </Command.Root>
+  );
+}
 ```
 
-Build before running browser or packed-package checks. Playwright starts the production demo and
-vanilla/Solid fixtures on ports 4321/4322; restart existing fixtures after package changes. `bench`
-measures engine-only work, not browser latency. See [verification and release gates](docs/implementation.md).
+`Command.Root` owns the flow in the common case. Pass an application-owned `flow` instead when you
+need external registration, async sources, persistence, or shared lifetime.
 
-[Biome](https://biomejs.dev/) handles formatting, linting, and import organization from the
-workspace root.
+## What CmdFlow owns
 
-## Changelogs and releases
+- Stable command identity, search, ranking, and active-item state
+- Independent main and contextual-action navigation stacks
+- Async source cancellation, pagination, and stale-result protection
+- Action execution, destructive confirmation, forms, and safe drafts
+- Keyboard, focus, modal, IME, and ARIA behavior through the DOM adapter
 
-[Tegami](https://tegami.fuma-nama.dev/) manages changelogs, coordinated package versions, npm
-publishing, git tags, and GitHub releases. All four `@cmdflow/*` packages belong to one
-release group and always receive the same version bump.
+Your application owns markup composition, visual design, authorization, data fetching, and action
+side effects. The preset is optional; remove it for a completely headless starting point.
 
-Create a changelog before merging a user-facing package change:
+## Packages
 
-```sh
-bun run tegami
-```
+| Package | Use it for |
+| --- | --- |
+| `@cmdflow/react` | Managed and application-owned React command interfaces |
+| `@cmdflow/solid` | The same product model with Solid-native reactivity |
+| `@cmdflow/dom` | Vanilla DOM rendering and framework adapter development |
+| `@cmdflow/core` | Framework-neutral flow ownership and custom renderers |
 
-Commit the generated `.tegami/*.md` file with the change. Pushes to `main` run the publish
-workflow: Tegami first opens or updates its Version Packages pull request, then publishes after
-that pull request is merged.
+Application code should normally install and import one adapter package. Adapters re-export the
+core factory and canonical `CmdFlow*` contracts needed by their consumers.
 
-The npm packages are configured for public access and trusted publishing. Before the first real
-release, an npm organization owner must run the one-time Tegami bootstrap described in the
-[trusted-publishing guide](https://tegami.fuma-nama.dev/plugins/npm#trusted-publishing).
+## Explore the repository
+
+Run `bun install` and `bun run dev`, then open [http://localhost:3000](http://localhost:3000). The
+demo uses only public React exports and covers async sources, action panels, nested views, forms,
+confirmation, and local ranking.
+
+## Learn the model
+
+- [Concepts](docs/concepts.md) — commands, actions, views, sources, and flow ownership
+- [Getting started](docs/getting-started.md) — React, Solid, and vanilla DOM
+- [Styling](docs/styling.md) — headless, scoped reset, and starter preset paths
+- [Persistence](docs/persistence.md) — opt-in learned-ranking storage and privacy
+- [v0.2 API contract](docs/api-v0.2.md) — the implementation source of truth
+
+Repository setup and architectural boundaries live in [CONTRIBUTING.md](CONTRIBUTING.md).

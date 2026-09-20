@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createCandidateId, createCmdFlow, createContextStore } from "../src/index.js";
 import type {
-  CmdFlow,
   FinalResultBatch,
   ResultBatch,
   ResultSource,
   SearchRequest,
-} from "../src/types.js";
+} from "../src/contracts/definitions.js";
+import type { CmdFlow } from "../src/contracts/flow.js";
+import { createCandidateId, createCmdFlow, createContextStore } from "../src/index.js";
 
 type Context = Record<string, never>;
 const flows = new Set<{ destroy(): void }>();

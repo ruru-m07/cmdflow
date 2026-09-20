@@ -1,64 +1,110 @@
 # @cmdflow/react
 
-React primitives over the shared `@cmdflow/core` store and `@cmdflow/dom` interaction controller.
-Requires React 18 or newer. Components forward refs, accept native presentation/event props, and ship
-without styles. Optional styles are available at `@cmdflow/dom/reset.css` and `@cmdflow/dom/preset.css`.
+Headless React primitives for CmdFlow. The common path owns its runtime and requires one package.
+
+> **v0.2 repository API:** This API is implemented in this repository but has not been published
+> yet. The currently published v0.1 package uses the earlier API.
+
+```sh
+bun add @cmdflow/react
+```
 
 ```tsx
-import { createCmdFlow } from "@cmdflow/core";
-import { Command } from "@cmdflow/react";
+import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
+import "@cmdflow/react/preset.css";
 
-const flow = createCmdFlow({
-  commands: [{ id: "issues", title: "My issues", run: () => openIssues() }],
-});
+const commands = [
+  {
+    id: "settings.open",
+    title: "Open settings",
+    action: {
+      type: "run",
+      id: "open",
+      title: "Open settings",
+      run: () => window.location.assign("/settings"),
+    },
+  },
+] satisfies readonly CmdFlowCommandDefinition[];
 
-function Palette() {
+export function CommandPalette() {
   return (
-    <Command.Root store={flow}>
+    <Command.Root commands={commands}>
       <Command.Trigger>Open commands</Command.Trigger>
       <Command.Dialog aria-label="Application commands">
-        <Command.Input aria-label="Search commands" />
+        <Command.Input placeholder="Search commands…" />
         <Command.List>
           {(item) => <Command.Item key={item.candidateId} item={item} />}
         </Command.List>
-        <Command.ActionsTrigger>Actions</Command.ActionsTrigger>
-        <Command.Actions>
-          <Command.Input aria-label="Search actions" />
-          <Command.List>
-            {(item) => <Command.Item key={item.candidateId} item={item} />}
-          </Command.List>
-        </Command.Actions>
-        <Command.Close>Close</Command.Close>
-        <Command.Status />
+        <Command.Empty>No commands found</Command.Empty>
       </Command.Dialog>
     </Command.Root>
   );
 }
 ```
 
-Use one store per application session, or per request when rendering on the server. Keep the store
-and optional `Root.options` object stable. The host owns the store: unmounting `Root` releases DOM
-bindings and subscriptions, while `flow.destroy()` ends the actual engine lifetime. React Strict
-Mode can remount bindings safely. Server rendering uses the engine's cached `getServerSnapshot`;
-hydration adopts the current client snapshot after the server markup has been matched.
-Dialog visibility and search text belong to the store: use `open`/`setOpen` and
-`setQuery`/`syncQuery`, not native `Dialog.open` or `Input.value`/`defaultValue` props. This preserves
-the native modal lifecycle and one authoritative query state.
+## Managed state
 
-`useCmdflowStore()` exposes the same store, `useCmdflow()` also exposes the DOM controller and
-snapshot, and `useCmdflowSelector(selector, optionalStore, equality)` subscribes to a selected
-snapshot value. `useCmdflowFrame(surface?)` chooses the main or actions frame. For custom elements,
-`useInputProps`, `useItemProps`, and `useFieldProps` return composed React props including refs.
+`commands` is stable initialization input. The managed root reads it when it creates the flow and
+does not reconcile later prop changes. Use an application-owned `flow` when commands must be
+registered or removed during the root's lifetime.
 
-Consumer event handlers run first; `preventDefault()` cancels internal handling. Input text uses
-`onInput`, including paste and IME composition. Required roles, IDs, and relationships are preserved;
-labels, classes, and styles remain customizable. Render secondary controls outside `Command.Item`.
+| State | Uncontrolled initial value | Controlled value | Change request |
+| --- | --- | --- | --- |
+| Dialog visibility | `defaultOpen` | `open` | `onOpenChange` |
+| Main-surface query | `defaultQuery` | `query` | `onQueryChange` |
 
-Forms use `Command.Form`, `FieldLabel`, `Field`, `Textarea`, `Select`, and `FieldError`. The field ID
-matches the core view definition. `Select` renders the definition's options unless children are
-provided. Form submission delegates validation and execution to core. `Confirmation`, `Confirm`,
-and `CancelConfirmation` render the explicit destructive-action or dirty-draft confirmation state.
-`Back` returns to the parent frame; inside `Actions` it acts on the independent actions stack.
+```tsx
+import { useState } from "react";
 
-Verification: `bun run test` covers SSR/hydration, refs, focus, event cancellation, exactly-once
-keyboard invocation, IME, independent actions, validated forms, selector isolation, and Strict Mode.
+export function ControlledCommandPalette() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  return (
+    <Command.Root
+      commands={commands}
+      open={open}
+      onOpenChange={setOpen}
+      query={query}
+      onQueryChange={setQuery}
+    >
+      {/* headless parts */}
+    </Command.Root>
+  );
+}
+```
+
+`defaultOpen` and `defaultQuery` are read once. A controlled callback reports the requested change;
+the next `open` or `query` prop commits it. Action-panel query state remains flow-owned. These state
+props are exclusive to the managed `commands` path; an advanced `flow` owner updates its runtime
+directly.
+
+## Compose rendered elements
+
+`Command.Dialog`, `Command.List`, `Command.Item`, and `Command.Trigger` support function-based
+element composition:
+
+```tsx
+<Command.Trigger render={(props) => <ToolbarButton {...props} />}>
+  Open commands
+</Command.Trigger>
+```
+
+The supplied props include CmdFlow's ref, event handlers, roles, ARIA relationships, and state
+attributes, so the rendered component must forward all native props and the ref. `PrimitiveRender`
+is exported for typing reusable render helpers. The function replaces the primitive's default
+element; CmdFlow does not clone a child or rely on implicit prop forwarding.
+
+Use `<Command.Root flow={flow}>` when the application owns registration, sources, ranking services,
+or runtime lifetime. Advanced consumers can compose with `useCmdFlow`, `useCmdFlowSelector`,
+`useCommandFrame`, and the prop hooks.
+
+The adapter also provides state-aware `Group`, `Empty`, `Loading`, `Error`, `LoadMore`, `View`,
+`ActionPanel`, form, selection, and confirmation primitives. They present core state without
+duplicating core policy.
+
+Optional learned-ranking persistence is available from `@cmdflow/react/persistence`; importing the
+entrypoint is safe during server rendering. See [persistence](../../docs/persistence.md).
+
+See [getting started](../../docs/getting-started.md), [concepts](../../docs/concepts.md), and
+[styling](../../docs/styling.md).

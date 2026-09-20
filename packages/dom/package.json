@@ -28,7 +28,7 @@
     "./preset.css": "./src/preset.css"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "build": "bun ../../scripts/clean-package-dist.ts && tsc --project tsconfig.json",
     "check-types": "tsc --noEmit",
     "test": "bun test tests"
   },
