@@ -1,3 +1,14 @@
+## @cmdflow/dom@0.2.0
+
+### Clean up the v0.2 command workflow API
+
+#### Clean up the v0.2 command workflow API
+
+Split the runtime, contracts, and framework primitives into focused modules; align React, Solid,
+and DOM adapters around the same command, action, view, and source model; add clearer package and
+concept documentation; and ship a monochrome Tailwind example that demonstrates the complete
+workflow.
+
 ## @cmdflow/dom@0.1.0
 
 ### Initial headless command-flow engine and adapters
