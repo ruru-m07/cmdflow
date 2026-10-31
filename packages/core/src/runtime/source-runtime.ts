@@ -144,7 +144,7 @@ export function createSourceRuntime<TContext, TData>(
       const batchIds = new Set<string>();
       for (const [index, item] of batch.items.entries()) {
         if (batchIds.has(item.id)) {
-          throw new TypeError(`Duplicate CmdFlow source item: ${item.id}`);
+          dependencies.diagnostic("duplicate-source-item", item.id);
         }
         if (!valid()) return;
         batchIds.add(item.id);

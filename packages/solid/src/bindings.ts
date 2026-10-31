@@ -26,9 +26,11 @@ export function createBoundProps<Element extends HTMLElement>(
   binding?: ElementBinding<Element>,
 ): ElementProps {
   const [local, consumer] = splitProps(input as ElementProps, ["children", "ref"]);
+  const children = createMemo(() => local.children);
   const combined = createMemo(() => {
     const props = mergeProps(internal(), consumer);
-    if (local.children !== undefined) props.children = local.children;
+    const content = children();
+    if (content !== undefined) props.children = content;
     return props;
   });
   const [mountedElement, setMountedElement] = createSignal<Element>();

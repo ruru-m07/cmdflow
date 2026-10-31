@@ -44,11 +44,7 @@ export default function Home() {
     if (!demo) return;
 
     try {
-      await demo.ranking.reset({
-        type: "surface",
-        subjectKey: "local-demo",
-        surfaceId: "palette",
-      });
+      await demo.flow.resetRanking();
       setActivity("Cleared the locally learned command order.");
     } catch {
       setActivity("Learning could not be reset. Refresh the page and try again.");

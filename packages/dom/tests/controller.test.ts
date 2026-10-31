@@ -19,19 +19,18 @@ function fixture(options: Parameters<typeof createDomController>[1] = {}, manage
       {
         id: "a",
         title: "Alpha",
-        run: () => {
-          runs += 1;
+        action: {
+          type: "run",
+          id: "open",
+          title: "Open",
+          priority: "primary",
+          run: () => {
+            runs += 1;
+          },
         },
         actions: [
           {
-            id: "open",
-            title: "Open",
-            priority: "primary",
-            run: () => {
-              runs += 1;
-            },
-          },
-          {
+            type: "run",
             id: "extra",
             title: "Extra",
             run: () => {
@@ -44,15 +43,25 @@ function fixture(options: Parameters<typeof createDomController>[1] = {}, manage
         id: "b",
         title: "Beta",
         enabled: () => ({ reason: "Sign in first" }),
-        run: () => {
-          runs += 100;
+        action: {
+          type: "run",
+          id: "open",
+          title: "Open",
+          run: () => {
+            runs += 100;
+          },
         },
       },
       {
         id: "c",
         title: "Charlie",
-        run: () => {
-          runs += 1_000;
+        action: {
+          type: "run",
+          id: "open",
+          title: "Open",
+          run: () => {
+            runs += 1_000;
+          },
         },
       },
     ],
@@ -78,7 +87,7 @@ function fixture(options: Parameters<typeof createDomController>[1] = {}, manage
   function render() {
     for (const dispose of rowDisposers) dispose();
     list.replaceChildren();
-    rowDisposers = store.getSnapshot().current.items.map((item) => {
+    rowDisposers = store.getSnapshot().mainFrame.items.map((item) => {
       const row = document.createElement("div");
       row.textContent = item.title;
       list.append(row);
@@ -161,8 +170,8 @@ describe("commit-bound DOM interaction", () => {
         inputType: "insertFromPaste",
       }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.query).toBe("char");
-    expect(f.store.getSnapshot().current.items[0]?.title).toBe("Charlie");
+    expect(f.store.getSnapshot().mainFrame.query).toBe("char");
+    expect(f.store.getSnapshot().mainFrame.items[0]?.title).toBe("Charlie");
     for (const key of ["Home", "End", "ArrowLeft", "ArrowRight", "Backspace"])
       expect(f.key(key).defaultPrevented).toBe(false);
   });
@@ -178,7 +187,7 @@ describe("commit-bound DOM interaction", () => {
     f.input.dispatchEvent(
       new f.window.InputEvent("input", { bubbles: true, isComposing: true }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.composing).toBe(true);
+    expect(f.store.getSnapshot().mainFrame.composing).toBe(true);
     for (const key of ["Enter", "Escape", "ArrowDown"])
       expect(f.key(key).defaultPrevented).toBe(false);
     expect(f.store.getSnapshot().open).toBe(true);
@@ -186,8 +195,8 @@ describe("commit-bound DOM interaction", () => {
     f.input.dispatchEvent(
       new f.window.CompositionEvent("compositionend", { bubbles: true }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.composing).toBe(false);
-    expect(f.store.getSnapshot().current.items).toHaveLength(1);
+    expect(f.store.getSnapshot().mainFrame.composing).toBe(false);
+    expect(f.store.getSnapshot().mainFrame.items).toHaveLength(1);
     f.render();
     f.key("Enter");
     await Promise.resolve();
@@ -214,9 +223,9 @@ describe("commit-bound DOM interaction", () => {
     const f = fixture({ eventMode: "props" });
     f.store.open();
     f.render();
-    const before = f.store.getSnapshot().current.activeId;
+    const before = f.store.getSnapshot().mainFrame.activeId;
     f.key("ArrowDown");
-    expect(f.store.getSnapshot().current.activeId).toBe(before);
+    expect(f.store.getSnapshot().mainFrame.activeId).toBe(before);
     const handler = f.controller.getInputProps().onKeyDown;
     f.input.addEventListener("keydown", handler);
     f.dialog.addEventListener("keydown", (event) =>
@@ -226,8 +235,9 @@ describe("commit-bound DOM interaction", () => {
     expect(
       f.store
         .getSnapshot()
-        .current.items.find((item) => item.candidateId === f.store.getSnapshot().current.activeId)
-        ?.title,
+        .mainFrame.items.find(
+          (item) => item.candidateId === f.store.getSnapshot().mainFrame.activeId,
+        )?.title,
     ).toBe("Beta");
     const event = new f.window.KeyboardEvent("keydown", { key: "Enter", cancelable: true });
     event.preventDefault();
@@ -250,7 +260,7 @@ describe("commit-bound DOM interaction", () => {
       }) as unknown as Event,
     );
     f.key("ArrowDown");
-    const active = f.store.getSnapshot().current.activeId;
+    const active = f.store.getSnapshot().mainFrame.activeId;
     first?.dispatchEvent(
       new f.window.PointerEvent("pointermove", {
         bubbles: true,
@@ -259,7 +269,7 @@ describe("commit-bound DOM interaction", () => {
         pointerType: "mouse",
       }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.activeId).toBe(active);
+    expect(f.store.getSnapshot().mainFrame.activeId).toBe(active);
   });
 
   test("restores actions opener and then shell opener", () => {
@@ -333,7 +343,7 @@ describe("commit-bound DOM interaction", () => {
     await Promise.resolve();
     expect(f.runs()).toBe(0);
     expect(f.store.getSnapshot().open).toBe(true);
-    expect(f.store.getSnapshot().current.composing).toBe(true);
+    expect(f.store.getSnapshot().mainFrame.composing).toBe(true);
   });
 
   test("InputEvent.isComposing protects composition even without a start event", async () => {
@@ -344,14 +354,14 @@ describe("commit-bound DOM interaction", () => {
     f.input.dispatchEvent(
       new f.window.InputEvent("input", { bubbles: true, isComposing: true }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.composing).toBe(true);
+    expect(f.store.getSnapshot().mainFrame.composing).toBe(true);
     f.key("Enter");
     await Promise.resolve();
     expect(f.runs()).toBe(0);
     f.input.dispatchEvent(
       new f.window.CompositionEvent("compositionend", { bubbles: true }) as unknown as Event,
     );
-    expect(f.store.getSnapshot().current.composing).toBe(false);
+    expect(f.store.getSnapshot().mainFrame.composing).toBe(false);
   });
 
   test("ignores stale committed snapshots and keeps newer focus effects pending", () => {
@@ -402,7 +412,7 @@ describe("commit-bound DOM interaction", () => {
     const f = fixture();
     f.store.open();
     f.render();
-    const item = f.store.getSnapshot().current.items[0];
+    const item = f.store.getSnapshot().mainFrame.items[0];
     if (!item) throw new Error("fixture missing item");
     const row = f.document.createElement("div");
     f.list.append(row);
@@ -436,8 +446,8 @@ describe("commit-bound DOM interaction", () => {
       id: "form",
       type: "form",
       title: "Edit",
-      fields: [{ id: "name", label: "Name", required: true }],
-      submit: { id: "save", title: "Save", run: () => {} },
+      fields: [{ type: "text", id: "name", label: "Name", required: true }],
+      submit: { type: "run", id: "save", title: "Save", run: () => {} },
     });
     const form = f.document.createElement("form");
     const input = f.document.createElement("input");
@@ -458,13 +468,18 @@ describe("commit-bound DOM interaction", () => {
     f.store.registerCommand({
       id: "delete",
       title: "Delete",
-      destructive: true,
-      priority: "primary",
-      run: () => {},
+      action: {
+        type: "run",
+        id: "delete",
+        title: "Delete",
+        destructive: true,
+        priority: "primary",
+        run: () => {},
+      },
     });
     f.store.open();
     f.render();
-    const item = f.store.getSnapshot().current.items.find((item) => item.id === "delete");
+    const item = f.store.getSnapshot().mainFrame.items.find((item) => item.id === "delete");
     if (!item) throw new Error("fixture missing delete command");
     const confirmation = f.document.createElement("div");
     const cancel = f.document.createElement("button");
@@ -474,7 +489,7 @@ describe("commit-bound DOM interaction", () => {
     f.controller.bindConfirmation(confirmation);
     await f.store.invoke({
       candidateId: item.candidateId,
-      address: { surface: "main", frameId: f.store.getSnapshot().current.id },
+      address: { surface: "main", frameId: f.store.getSnapshot().mainFrame.id },
     });
     f.controller.sync();
     expect(f.document.activeElement).toBe(confirmation);

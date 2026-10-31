@@ -8,7 +8,12 @@ describe("narrow interaction commits", () => {
         id: String(index),
         title: `Command ${index}`,
         data: { value: index },
-        run: () => {},
+        action: {
+          type: "run",
+          id: String(index),
+          title: `Command ${index}`,
+          run: () => {},
+        },
       })),
     });
     const before = store.getSnapshot();
@@ -16,19 +21,19 @@ describe("narrow interaction commits", () => {
     store.moveActive("next");
     const after = store.getSnapshot();
     expect(after.revision).toBeGreaterThan(before.revision);
-    expect(after.current.activeId).not.toBe(before.current.activeId);
-    expect(after.current.items).toBe(before.current.items);
-    expect(after.current.items[0]?.data).toBe(before.current.items[0]?.data);
-    expect(after.current.selectedIds).toBe(before.current.selectedIds);
+    expect(after.mainFrame.activeId).not.toBe(before.mainFrame.activeId);
+    expect(after.mainFrame.items).toBe(before.mainFrame.items);
+    expect(after.mainFrame.items[0]?.data).toBe(before.mainFrame.items[0]?.data);
+    expect(after.mainFrame.selectedIds).toBe(before.mainFrame.selectedIds);
     expect(store.explainRanking()).toBe(ranking);
-    const activeItem = after.current.items.find(
-      (item) => item.candidateId === after.current.activeId,
+    const activeItem = after.mainFrame.items.find(
+      (item) => item.candidateId === after.mainFrame.activeId,
     );
     if (!activeItem) throw new Error("fixture missing active item");
-    expect(after.current.actions).toBe(activeItem.actions);
+    expect(after.mainFrame.actions).toBe(activeItem.actions);
     const stable = store.getSnapshot();
-    if (!stable.current.activeId) throw new Error("fixture missing active item");
-    store.setActive(stable.current.activeId);
+    if (!stable.mainFrame.activeId) throw new Error("fixture missing active item");
+    store.setActive(stable.mainFrame.activeId);
     expect(store.getSnapshot()).toBe(stable);
     store.destroy();
   });
@@ -41,6 +46,7 @@ describe("narrow interaction commits", () => {
           title: "A",
           actions: [
             {
+              type: "run",
               id: "context",
               title: "Context",
               enabled: ({ frame, item }) => frame.activeId === item?.candidateId,
@@ -53,6 +59,7 @@ describe("narrow interaction commits", () => {
           title: "B",
           actions: [
             {
+              type: "run",
               id: "context",
               title: "Context",
               enabled: ({ frame, item }) => frame.activeId === item?.candidateId,
@@ -60,17 +67,21 @@ describe("narrow interaction commits", () => {
             },
           ],
         },
-        { id: "c", title: "C", run: () => {} },
+        {
+          id: "c",
+          title: "C",
+          action: { type: "run", id: "c", title: "C", run: () => {} },
+        },
       ],
     });
     const before = store.getSnapshot();
     const ranking = store.explainRanking();
     store.moveActive("next");
     const after = store.getSnapshot();
-    expect(after.current.items[0]?.actions[0]?.disabled).toBe(true);
-    expect(after.current.items[1]?.actions[0]?.disabled).toBe(false);
-    expect(after.current.actions[0]?.disabled).toBe(false);
-    expect(after.current.items[2]).toBe(before.current.items[2]);
+    expect(after.mainFrame.items[0]?.actions[0]?.disabled).toBe(true);
+    expect(after.mainFrame.items[1]?.actions[0]?.disabled).toBe(false);
+    expect(after.mainFrame.actions[0]?.disabled).toBe(false);
+    expect(after.mainFrame.items[2]).toBe(before.mainFrame.items[2]);
     expect(store.explainRanking()).toBe(ranking);
     store.destroy();
   });
@@ -84,6 +95,7 @@ describe("narrow interaction commits", () => {
           title: "A",
           actions: [
             {
+              type: "run",
               id: "bulk",
               title: "Bulk",
               enabled: ({ selection, frame }) =>
@@ -92,21 +104,25 @@ describe("narrow interaction commits", () => {
             },
           ],
         },
-        { id: "b", title: "B", run: () => {} },
+        {
+          id: "b",
+          title: "B",
+          action: { type: "run", id: "b", title: "B", run: () => {} },
+        },
       ],
     });
     const before = store.getSnapshot();
     const ranking = store.explainRanking();
-    const selected = before.current.items[1]?.candidateId;
+    const selected = before.mainFrame.items[1]?.candidateId;
     if (!selected) throw new Error("fixture missing selected item");
     store.toggleSelected(selected);
     const after = store.getSnapshot();
-    expect(after.current.selectedIds).toEqual([selected]);
-    expect(after.current.actions[0]?.disabled).toBe(false);
-    expect(after.current.items[1]).toBe(before.current.items[1]);
+    expect(after.mainFrame.selectedIds).toEqual([selected]);
+    expect(after.mainFrame.actions[0]?.disabled).toBe(false);
+    expect(after.mainFrame.items[1]).toBe(before.mainFrame.items[1]);
     expect(store.explainRanking()).toBe(ranking);
     store.toggleSelected(selected);
-    expect(store.getSnapshot().current.actions[0]?.disabled).toBe(true);
+    expect(store.getSnapshot().mainFrame.actions[0]?.disabled).toBe(true);
     store.destroy();
   });
 
@@ -121,20 +137,20 @@ describe("narrow interaction commits", () => {
             evaluations += 1;
             return true;
           },
-          run: () => {},
+          action: { type: "run", id: "a", title: "A", run: () => {} },
         },
       ],
     });
     const before = store.getSnapshot();
     const ranking = store.explainRanking();
-    const active = before.current.activeId;
+    const active = before.mainFrame.activeId;
     if (!active) throw new Error("fixture missing active item");
     const count = evaluations;
     store.setScrollAnchor({ candidateId: active, offset: -20 });
     const after = store.getSnapshot();
     expect(evaluations).toBe(count);
-    expect(after.current.items).toBe(before.current.items);
-    expect(after.current.scrollAnchor).toEqual({ candidateId: active, offset: -20 });
+    expect(after.mainFrame.items).toBe(before.mainFrame.items);
+    expect(after.mainFrame.scrollAnchor).toEqual({ candidateId: active, offset: -20 });
     expect(store.explainRanking()).toBe(ranking);
     store.setScrollAnchor({ candidateId: active, offset: -20 });
     expect(store.getSnapshot()).toBe(after);

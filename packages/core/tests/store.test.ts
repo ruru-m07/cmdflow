@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { CommandDefinition, ResultBatch, ViewDefinition } from "../src/index.js";
+import type {
+  CmdFlowCommandDefinition,
+  CmdFlowResultBatch,
+  CmdFlowViewDefinition,
+} from "../src/index.js";
 import {
   createCandidateId,
   createCmdFlow,
@@ -25,12 +29,17 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-function commands(count = 10): CommandDefinition<Record<string, never>>[] {
+function commands(count = 10): CmdFlowCommandDefinition<Record<string, never>>[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `github-${i}`,
     title: `GitHub result ${i}`,
     keywords: ["github"],
-    run: () => ({ type: "stay" as const }),
+    action: {
+      type: "run" as const,
+      id: `github-${i}`,
+      title: `GitHub result ${i}`,
+      run: () => ({ type: "stay" as const }),
+    },
   }));
 }
 
@@ -48,8 +57,8 @@ describe("CmdFlow registry and immutable store", () => {
     flow.open();
     expect(flow.getSnapshot()).not.toBe(before);
     expect(calls).toBeGreaterThan(0);
-    expect(Object.isFrozen(flow.getSnapshot().current.items)).toBe(true);
-    expect(Object.isFrozen(flow.getSnapshot().current.items[0])).toBe(true);
+    expect(Object.isFrozen(flow.getSnapshot().mainFrame.items)).toBe(true);
+    expect(Object.isFrozen(flow.getSnapshot().mainFrame.items[0])).toBe(true);
     off();
     const current = calls;
     flow.setQuery("result");
@@ -68,15 +77,15 @@ describe("CmdFlow registry and immutable store", () => {
         ],
       }),
     ).toThrow();
-    expect(flow.getSnapshot().current.items.map((item) => item.id)).toEqual(["github-0"]);
+    expect(flow.getSnapshot().mainFrame.items.map((item) => item.id)).toEqual(["github-0"]);
     const off = flow.registerExtension({
       id: "extra",
       commands: [{ id: "other", title: "Other" }],
     });
-    expect(flow.getSnapshot().current.items).toHaveLength(2);
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(2);
     off();
     off();
-    expect(flow.getSnapshot().current.items).toHaveLength(1);
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(1);
     flow.destroy();
   });
   test("reactive context updates visibility and disabled state", async () => {
@@ -90,19 +99,24 @@ describe("CmdFlow registry and immutable store", () => {
           title: "GitHub",
           visible: ({ appContext }) => appContext.connected,
           enabled: ({ appContext }) => appContext.online || { reason: "Offline" },
-          run: () => {
-            called++;
+          action: {
+            type: "run",
+            id: "github",
+            title: "GitHub",
+            run: () => {
+              called++;
+            },
           },
         },
       ],
     });
-    expect(flow.getSnapshot().current.items).toHaveLength(0);
+    flow.open();
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(0);
     context.set({ connected: true, online: false });
-    expect(flow.getSnapshot().current.items[0]?.disabledReason).toBe("Offline");
+    expect(flow.getSnapshot().mainFrame.items[0]?.disabledReason).toBe("Offline");
     expect((await flow.invoke()).status).toBe("disabled");
     expect(called).toBe(0);
     context.set({ connected: true, online: true });
-    flow.open();
     expect((await flow.invoke()).status).toBe("success");
     expect(called).toBe(1);
     flow.destroy();
@@ -122,7 +136,7 @@ describe("CmdFlow registry and immutable store", () => {
       ],
       onDiagnostic: (event) => events.push(event.type),
     });
-    expect(flow.getSnapshot().current.items).toHaveLength(1);
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(1);
     expect(events).toContain("command-error");
     flow.destroy();
   });
@@ -141,9 +155,9 @@ describe("CmdFlow registry and immutable store", () => {
     flow.setOpen(true);
     flow.setQuery("github");
     expect(queries).toEqual(["github"]);
-    expect(flow.getSnapshot().current.query).toBe("");
+    expect(flow.getSnapshot().mainFrame.query).toBe("");
     flow.syncQuery("github");
-    expect(flow.getSnapshot().current.query).toBe("github");
+    expect(flow.getSnapshot().mainFrame.query).toBe("github");
     flow.close();
     expect(flow.getSnapshot().open).toBe(true);
     flow.destroy();
@@ -159,9 +173,17 @@ describe("navigation and contextual actions", () => {
           title: "GitHub Issue",
           actions: [
             {
+              type: "submenu",
               id: "state",
               title: "Change state",
-              children: [{ id: "close", title: "Close issue", run: () => ({ type: "stay" }) }],
+              actions: [
+                {
+                  type: "run",
+                  id: "close",
+                  title: "Close issue",
+                  run: () => ({ type: "stay" }),
+                },
+              ],
             },
           ],
         },
@@ -169,22 +191,22 @@ describe("navigation and contextual actions", () => {
     });
     flow.open();
     flow.setQuery("github");
-    const root = flow.getSnapshot().current;
+    const root = flow.getSnapshot().mainFrame;
     const active = required(root.activeId);
     flow.setScrollAnchor({ candidateId: active, offset: 12 });
     flow.openActions();
-    expect(flow.getSnapshot().main).toHaveLength(1);
-    expect(flow.getSnapshot().actions).toHaveLength(1);
+    expect(flow.getSnapshot().mainFrames).toHaveLength(1);
+    expect(flow.getSnapshot().actionFrames).toHaveLength(1);
     const actionFrame = required(flow.getSnapshot().actionFrame);
     await flow.invoke({ address: { surface: "actions", frameId: actionFrame.id } });
-    expect(flow.getSnapshot().actions).toHaveLength(2);
+    expect(flow.getSnapshot().actionFrames).toHaveLength(2);
     flow.escape();
-    expect(flow.getSnapshot().actions).toHaveLength(1);
+    expect(flow.getSnapshot().actionFrames).toHaveLength(1);
     flow.escape();
-    expect(flow.getSnapshot().actions).toHaveLength(0);
-    expect(flow.getSnapshot().current.query).toBe("github");
-    expect(flow.getSnapshot().current.activeId).toBe(active);
-    expect(flow.getSnapshot().current.scrollAnchor?.offset).toBe(12);
+    expect(flow.getSnapshot().actionFrames).toHaveLength(0);
+    expect(flow.getSnapshot().mainFrame.query).toBe("github");
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(active);
+    expect(flow.getSnapshot().mainFrame.scrollAnchor?.offset).toBe(12);
     flow.destroy();
   });
   test("nested view back restores parent selection; composing Escape does nothing", () => {
@@ -192,17 +214,17 @@ describe("navigation and contextual actions", () => {
     flow.open();
     flow.setQuery("github");
     flow.moveActive("next");
-    const selected = flow.getSnapshot().current.activeId;
+    const selected = flow.getSnapshot().mainFrame.activeId;
     flow.push({ id: "child", type: "list", items: [{ id: "one", title: "One" }] });
     flow.setQuery("字", undefined, true);
     flow.escape();
-    expect(flow.getSnapshot().main).toHaveLength(2);
+    expect(flow.getSnapshot().mainFrames).toHaveLength(2);
     flow.setQuery("字", undefined, false);
     flow.escape();
-    expect(flow.getSnapshot().main).toHaveLength(1);
-    expect(flow.getSnapshot().current.activeId).toBe(selected);
+    expect(flow.getSnapshot().mainFrames).toHaveLength(1);
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(selected);
     flow.escape();
-    expect(flow.getSnapshot().current.query).toBe("");
+    expect(flow.getSnapshot().mainFrame.query).toBe("");
     flow.escape();
     expect(flow.getSnapshot().open).toBe(false);
     flow.destroy();
@@ -216,17 +238,22 @@ describe("navigation and contextual actions", () => {
           id: "disabled",
           title: "Disabled",
           disabled: { reason: "Unavailable" },
-          run: () => {
-            called++;
+          action: {
+            type: "run",
+            id: "disabled",
+            title: "Disabled",
+            run: () => {
+              called++;
+            },
           },
         },
       ],
     });
     flow.open();
-    const active = required(flow.getSnapshot().current.activeId);
+    const active = required(flow.getSnapshot().mainFrame.activeId);
     expect(active).not.toBeNull();
     flow.toggleSelected(active);
-    expect(flow.getSnapshot().current.selectedIds).toHaveLength(0);
+    expect(flow.getSnapshot().mainFrame.selectedIds).toHaveLength(0);
     expect((await flow.invoke()).status).toBe("disabled");
     expect(called).toBe(0);
     flow.destroy();
@@ -238,10 +265,15 @@ describe("navigation and contextual actions", () => {
         {
           id: "delete",
           title: "Delete",
-          destructive: true,
-          priority: "primary",
-          run: () => {
-            called++;
+          action: {
+            type: "run",
+            id: "delete",
+            title: "Delete",
+            destructive: true,
+            priority: "primary",
+            run: () => {
+              called++;
+            },
           },
         },
       ],
@@ -257,11 +289,23 @@ describe("navigation and contextual actions", () => {
   test("an old detached execution cannot close a reopened panel", async () => {
     const pending = deferred<{ type: "close" }>();
     const flow = createCmdFlow({
-      commands: [{ id: "slow", title: "Slow", lifecycle: "detached", run: () => pending.promise }],
+      commands: [
+        {
+          id: "slow",
+          title: "Slow",
+          action: {
+            type: "run",
+            id: "slow",
+            title: "Slow",
+            lifecycle: "detached",
+            run: () => pending.promise,
+          },
+        },
+      ],
     });
     flow.open();
     const execution = flow.invoke({
-      address: { surface: "main", frameId: flow.getSnapshot().current.id },
+      address: { surface: "main", frameId: flow.getSnapshot().mainFrame.id },
     });
     flow.close();
     flow.open();
@@ -282,9 +326,14 @@ describe("navigation and contextual actions", () => {
         {
           id: "slow",
           title: "Slow",
-          run: (input) => {
-            signal = input.signal;
-            return pending.promise;
+          action: {
+            type: "run",
+            id: "slow",
+            title: "Slow",
+            run: (input) => {
+              signal = input.signal;
+              return pending.promise;
+            },
           },
         },
       ],
@@ -311,8 +360,13 @@ describe("providers", () => {
             {
               id: "1",
               title: id,
-              run: () => {
-                called.push(id);
+              action: {
+                type: "run" as const,
+                id: "1",
+                title: id,
+                run: () => {
+                  called.push(id);
+                },
               },
             },
           ],
@@ -321,7 +375,7 @@ describe("providers", () => {
     });
     flow.open();
     await tick();
-    const items = flow.getSnapshot().current.items;
+    const items = flow.getSnapshot().mainFrame.items;
     expect(items).toHaveLength(2);
     expect(items[0]?.candidateId).not.toBe(items[1]?.candidateId);
     await flow.invoke({ candidateId: items[1]?.candidateId });
@@ -331,17 +385,17 @@ describe("providers", () => {
   test("stale queries cannot replace current results even when transport ignores abort", async () => {
     const requests = new Map<
       string,
-      ReturnType<typeof deferred<ResultBatch<Record<string, never>>>>
+      ReturnType<typeof deferred<CmdFlowResultBatch<Record<string, never>>>>
     >();
     const flow = createCmdFlow({
       sources: [
         {
           id: "remote",
           search: (request) => {
-            const pending = deferred<ResultBatch<Record<string, never>>>();
+            const pending = deferred<CmdFlowResultBatch<Record<string, never>>>();
             requests.set(request.rawQuery, pending);
             return pending.promise as Promise<
-              Extract<ResultBatch<Record<string, never>>, { done: true }>
+              Extract<CmdFlowResultBatch<Record<string, never>>, { done: true }>
             >;
           },
         },
@@ -362,7 +416,7 @@ describe("providers", () => {
       items: [{ id: "old", title: "Old" }],
     });
     await tick();
-    expect(flow.getSnapshot().current.items.map((item) => item.id)).toEqual(["new"]);
+    expect(flow.getSnapshot().mainFrame.items.map((item) => item.id)).toEqual(["new"]);
     flow.destroy();
   });
   test("provider errors isolate successful peers and retryable pages accumulate", async () => {
@@ -394,12 +448,12 @@ describe("providers", () => {
     });
     flow.open();
     await tick();
-    expect(flow.getSnapshot().current.sources.find((source) => source.id === "bad")?.status).toBe(
+    expect(flow.getSnapshot().mainFrame.sources.find((source) => source.id === "bad")?.status).toBe(
       "error",
     );
-    expect(flow.getSnapshot().current.items).toHaveLength(1);
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(1);
     await flow.loadMore("good");
-    expect(flow.getSnapshot().current.items).toHaveLength(2);
+    expect(flow.getSnapshot().mainFrame.items).toHaveLength(2);
     flow.destroy();
   });
   test("composition changes input but does not launch providers until committed", async () => {
@@ -420,7 +474,7 @@ describe("providers", () => {
     flow.setQuery("日", undefined, true);
     flow.setQuery("日本", undefined, true);
     expect(searched).toEqual([""]);
-    expect(flow.getSnapshot().current.query).toBe("日本");
+    expect(flow.getSnapshot().mainFrame.query).toBe("日本");
     flow.setQuery("日本", undefined, false);
     await tick();
     expect(searched).toEqual(["", "日本"]);
@@ -434,19 +488,19 @@ describe("learning and forms", () => {
     flow.open();
     flow.setQuery("github");
     await tick();
-    const sixth = required(flow.getSnapshot().current.items[5]);
+    const sixth = required(flow.getSnapshot().mainFrame.items[5]);
     flow.setActive(sixth.candidateId);
     await flow.invoke();
     flow.close();
     flow.open();
     flow.setQuery("github");
     await tick();
-    expect(flow.getSnapshot().current.items[0]?.candidateId).toBe(sixth.candidateId);
+    expect(flow.getSnapshot().mainFrame.items[0]?.candidateId).toBe(sixth.candidateId);
     expect(flow.explainRanking()[0]?.exactSurfaceAffinityFixed).toBeGreaterThan(0);
     await flow.resetRanking();
     flow.setQuery("");
     flow.setQuery("github");
-    expect(flow.getSnapshot().current.items[0]?.id).toBe("github-0");
+    expect(flow.getSnapshot().mainFrame.items[0]?.id).toBe("github-0");
     flow.destroy();
   });
   test("highlight and failed actions do not create positive history", async () => {
@@ -457,8 +511,13 @@ describe("learning and forms", () => {
         {
           id: "fail",
           title: "Fail",
-          run: () => {
-            throw new Error("failure");
+          action: {
+            type: "run",
+            id: "fail",
+            title: "Fail",
+            run: () => {
+              throw new Error("failure");
+            },
           },
         },
       ],
@@ -475,14 +534,15 @@ describe("learning and forms", () => {
   });
   test("forms validate, preserve drafts on nested navigation, exclude secure values, and submit", async () => {
     let submitted: unknown;
-    const form: ViewDefinition<Record<string, never>> = {
+    const form: CmdFlowViewDefinition<Record<string, never>> = {
       id: "form",
       type: "form",
       fields: [
-        { id: "title", label: "Title", required: true },
+        { id: "title", type: "text", label: "Title", required: true },
         { id: "password", label: "Password", type: "password" },
       ],
       submit: {
+        type: "run",
         id: "save",
         title: "Save",
         run: ({ values }) => {
@@ -494,28 +554,33 @@ describe("learning and forms", () => {
     flow.open();
     flow.push(form);
     expect((await flow.submitForm()).status).toBe("error");
-    expect(flow.getSnapshot().current.form.errors.title).toBe("Title is required");
+    expect(flow.getSnapshot().mainFrame.form.errors.title).toBe("Title is required");
     flow.setField("title", "Fix bug");
     flow.setField("password", "secret");
     expect(flow.getSafeDraft()).toEqual({ title: "Fix bug" });
     flow.push({ id: "picker", type: "list" });
     flow.pop();
-    expect(flow.getSnapshot().current.form.values.title).toBe("Fix bug");
+    expect(flow.getSnapshot().mainFrame.form.values.title).toBe("Fix bug");
     expect((await flow.submitForm()).status).toBe("success");
     expect(submitted).toEqual({ title: "Fix bug", password: "secret" });
-    expect(flow.getSnapshot().current.form.dirty).toBe(false);
+    expect(flow.getSnapshot().mainFrame.form.dirty).toBe(false);
     flow.destroy();
   });
   test("dirty form close is confirmed; canceled confirmation keeps values", async () => {
     const flow = createCmdFlow();
     flow.open();
-    flow.push({ id: "form", type: "form", fields: [{ id: "title", label: "Title" }] });
+    flow.push({
+      id: "form",
+      type: "form",
+      fields: [{ id: "title", type: "text", label: "Title" }],
+      submit: { type: "run", id: "save", title: "Save", run() {} },
+    });
     flow.setField("title", "draft");
     flow.close();
     expect(flow.getSnapshot().open).toBe(true);
     expect(flow.getSnapshot().confirmation?.kind).toBe("discard");
     flow.cancelConfirmation();
-    expect(flow.getSnapshot().current.form.values.title).toBe("draft");
+    expect(flow.getSnapshot().mainFrame.form.values.title).toBe("draft");
     flow.close();
     await flow.confirm();
     expect(flow.getSnapshot().open).toBe(false);

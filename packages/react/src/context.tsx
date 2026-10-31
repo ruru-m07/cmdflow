@@ -194,7 +194,7 @@ function FlowProvider({
   return createElement(
     CommandContext.Provider,
     { value },
-    createElement(Fragment, null, createElement(ControllerCommit, { flow, controller }), children),
+    createElement(Fragment, null, children, createElement(ControllerCommit, { flow, controller })),
   );
 }
 

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { ActionOutcome, FeedbackCommit, RankingStore, ViewDefinition } from "../src/index.js";
+import type {
+  CmdFlowActionOutcome,
+  CmdFlowViewDefinition,
+  FeedbackCommit,
+  RankingStore,
+} from "../src/index.js";
 import { createCmdFlow, createMemoryRankingStore } from "../src/index.js";
 
 const tick = async () => {
@@ -21,9 +26,14 @@ describe("lifecycle regression contracts", () => {
         {
           id: "close",
           title: "Close",
-          run: () => {
-            ran++;
-            return { type: "close" };
+          action: {
+            type: "run",
+            id: "close",
+            title: "Close",
+            run: () => {
+              ran++;
+              return { type: "close" };
+            },
           },
         },
       ],
@@ -32,7 +42,7 @@ describe("lifecycle regression contracts", () => {
     await flow.invoke();
     expect(ran).toBe(1);
     expect(flow.getSnapshot().open).toBe(true);
-    await flow.invoke({ address: { surface: "main", frameId: flow.getSnapshot().current.id } });
+    await flow.invoke({ address: { surface: "main", frameId: flow.getSnapshot().mainFrame.id } });
     expect(flow.getSnapshot().open).toBe(false);
     flow.destroy();
   });
@@ -41,8 +51,8 @@ describe("lifecycle regression contracts", () => {
     flow.open();
     flow.setQuery("x", undefined, true);
     flow.setQuery("x", undefined, false);
-    expect(flow.getSnapshot().current.composing).toBe(false);
-    expect(flow.getSnapshot().current.query).toBe("");
+    expect(flow.getSnapshot().mainFrame.composing).toBe(false);
+    expect(flow.getSnapshot().mainFrame.query).toBe("");
     flow.destroy();
   });
   test("sources cannot use reserved identity namespaces", () => {
@@ -67,6 +77,7 @@ describe("lifecycle regression contracts", () => {
           enabled: () => enabled,
           actions: [
             {
+              type: "run",
               id: "run",
               title: "Run",
               run: () => {
@@ -92,6 +103,7 @@ describe("lifecycle regression contracts", () => {
           data: { allowed: true },
           actions: [
             {
+              type: "run",
               id: "run",
               title: "Run",
               enabled: ({ item }) => (item?.data as { allowed: boolean })?.allowed ?? false,
@@ -101,30 +113,36 @@ describe("lifecycle regression contracts", () => {
         },
       ],
     });
-    expect(flow.getSnapshot().current.actions[0]?.disabled).toBe(false);
+    expect(flow.getSnapshot().mainFrame.actions[0]?.disabled).toBe(false);
     flow.destroy();
   });
   test("disposing a source aborts its in-flight action even if transport ignores abort", async () => {
-    const pending = deferred<ActionOutcome<Record<string, never>>>();
+    const pending = deferred<CmdFlowActionOutcome<Record<string, never>>>();
     const flow = createCmdFlow();
     const dispose = flow.registerSource({
       id: "remote",
       search: () => ({
         operation: "replace",
         done: true,
-        items: [{ id: "a", title: "A", run: () => pending.promise }],
+        items: [
+          {
+            id: "a",
+            title: "A",
+            action: { type: "run", id: "a", title: "A", run: () => pending.promise },
+          },
+        ],
       }),
     });
     flow.open();
     await tick();
     const execution = flow.invoke({
-      address: { surface: "main", frameId: flow.getSnapshot().current.id },
+      address: { surface: "main", frameId: flow.getSnapshot().mainFrame.id },
     });
     dispose();
     expect((await execution).status).toBe("aborted");
     pending.resolve({ type: "push-view", view: { id: "stale", type: "detail" } });
     await tick();
-    expect(flow.getSnapshot().current.view.id).toBe("root");
+    expect(flow.getSnapshot().mainFrame.view.id).toBe("root");
     flow.destroy();
   });
   test("a disposed destructive command cannot be resurrected by its confirmation", async () => {
@@ -133,10 +151,15 @@ describe("lifecycle regression contracts", () => {
     const dispose = flow.registerCommand({
       id: "delete",
       title: "Delete",
-      destructive: true,
-      priority: "primary",
-      run: () => {
-        ran = true;
+      action: {
+        type: "run",
+        id: "delete",
+        title: "Delete",
+        destructive: true,
+        priority: "primary",
+        run: () => {
+          ran = true;
+        },
       },
     });
     flow.open();
@@ -153,8 +176,13 @@ describe("lifecycle regression contracts", () => {
         {
           id: "a",
           title: "A",
-          run: () => {
-            ran = true;
+          action: {
+            type: "run",
+            id: "a",
+            title: "A",
+            run: () => {
+              ran = true;
+            },
           },
         },
       ],
@@ -169,7 +197,7 @@ describe("lifecycle regression contracts", () => {
     flow.destroy();
   });
   test("feedback uses the invocation query and cannot delay UI outcomes", async () => {
-    const action = deferred<ActionOutcome<Record<string, never>>>();
+    const action = deferred<CmdFlowActionOutcome<Record<string, never>>>();
     const persisted = deferred<void>();
     const commits: FeedbackCommit[] = [];
     const memory = createMemoryRankingStore({ allowPlainQueryKeys: true });
@@ -182,12 +210,18 @@ describe("lifecycle regression contracts", () => {
     };
     const flow = createCmdFlow({
       ranking: { store: storage, scope: { subjectKey: "test", surfaceId: "test" } },
-      commands: [{ id: "a", title: "GitHub", run: () => action.promise }],
+      commands: [
+        {
+          id: "a",
+          title: "GitHub",
+          action: { type: "run", id: "a", title: "GitHub", run: () => action.promise },
+        },
+      ],
     });
     flow.open();
     flow.setQuery("github");
     const execution = flow.invoke({
-      address: { surface: "main", frameId: flow.getSnapshot().current.id },
+      address: { surface: "main", frameId: flow.getSnapshot().mainFrame.id },
     });
     flow.setQuery("later query");
     action.resolve({ type: "close" });
@@ -205,8 +239,8 @@ describe("lifecycle regression contracts", () => {
     flow.push({
       id: "form",
       type: "form",
-      fields: [{ id: "title", label: "Title" }],
-      submit: { id: "save", title: "Save", run: () => ({ type: "close" }) },
+      fields: [{ id: "title", type: "text", label: "Title" }],
+      submit: { type: "run", id: "save", title: "Save", run: () => ({ type: "close" }) },
     });
     flow.setField("title", "Ready");
     expect((await flow.submitForm()).status).toBe("success");
@@ -215,10 +249,11 @@ describe("lifecycle regression contracts", () => {
     flow.destroy();
   });
   test("canceling a nested dirty form preserves the parent's dirty state", async () => {
-    const form = (id: string): ViewDefinition<Record<string, never>> => ({
+    const form = (id: string): CmdFlowViewDefinition<Record<string, never>> => ({
       id,
       type: "form",
-      fields: [{ id: "text", label: "Text" }],
+      fields: [{ id: "text", type: "text", label: "Text" }],
+      submit: { type: "run", id: "save", title: "Save", run() {} },
     });
     const flow = createCmdFlow();
     flow.open();
@@ -228,8 +263,8 @@ describe("lifecycle regression contracts", () => {
     flow.setField("text", "child draft");
     flow.pop();
     await flow.confirm();
-    expect(flow.getSnapshot().current.form.dirty).toBe(true);
-    expect(flow.getSnapshot().current.form.values.text).toBe("parent draft");
+    expect(flow.getSnapshot().mainFrame.form.dirty).toBe(true);
+    expect(flow.getSnapshot().mainFrame.form.values.text).toBe("parent draft");
     flow.destroy();
   });
   test("closing aborts signal-ignoring validation and settles submission", async () => {
@@ -242,14 +277,15 @@ describe("lifecycle regression contracts", () => {
       fields: [
         {
           id: "text",
+          type: "text",
           label: "Text",
           validate: (_, input) => {
             signal = input.signal;
-            return new Promise(() => {});
+            return new Promise<string | undefined>(() => {});
           },
         },
       ],
-      submit: { id: "save", title: "Save", run() {} },
+      submit: { type: "run", id: "save", title: "Save", run() {} },
     });
     const submission = flow.submitForm();
     flow.setOpen(false);

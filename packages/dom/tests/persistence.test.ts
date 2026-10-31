@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type {
   CmdFlow,
-  CommandDefinition,
+  CmdFlowCommandDefinition,
   FeedbackCommit,
   RankingInvalidation,
   RankingQueryPolicy,
@@ -72,12 +72,17 @@ function feedbackFinished(flow: Pick<CmdFlow, "onEvent">): Promise<void> {
   });
 }
 
-function githubCommands(): CommandDefinition<Record<string, never>>[] {
+function githubCommands(): CmdFlowCommandDefinition<Record<string, never>>[] {
   return Array.from({ length: 10 }, (_, at) => ({
     id: `github-${at}`,
     title: `GitHub result ${at}`,
-    run: () => ({ type: "stay" }),
-    actions: [{ id: "copy", title: "Copy link", run: () => ({ type: "stay" }) }],
+    action: {
+      type: "run",
+      id: "open",
+      title: "Open",
+      run: () => ({ type: "stay" }),
+    },
+    actions: [{ type: "run", id: "copy", title: "Copy link", run: () => ({ type: "stay" }) }],
   }));
 }
 
@@ -473,8 +478,8 @@ describe("CmdFlow and persistent ranking integration", () => {
     first.open();
     first.setQuery("github");
     await waitForFlow(first, () => first.getSnapshot().rankingReady);
-    expect(first.getSnapshot().current.items).toHaveLength(10);
-    const sixth = first.getSnapshot().current.items[5];
+    expect(first.getSnapshot().mainFrame.items).toHaveLength(10);
+    const sixth = first.getSnapshot().mainFrame.items[5];
     expect(sixth?.id).toBe("github-5");
     if (!sixth) throw new Error("Missing sixth result.");
     first.setActive(sixth.candidateId);
@@ -500,7 +505,7 @@ describe("CmdFlow and persistent ranking integration", () => {
         second.getSnapshot().rankingReady &&
         second.explainRanking()[0]?.exactContextAffinityFixed === 1_000,
     );
-    expect(second.getSnapshot().current.items[0]?.candidateId).toBe(sixth.candidateId);
+    expect(second.getSnapshot().mainFrame.items[0]?.candidateId).toBe(sixth.candidateId);
     second.setActive(sixth.candidateId);
     const secondLearned = feedbackFinished(second);
     await second.invoke();
@@ -525,7 +530,7 @@ describe("CmdFlow and persistent ranking integration", () => {
     flow.open();
     flow.setQuery("github");
     await waitForFlow(flow, () => flow.getSnapshot().rankingReady);
-    const selected = flow.getSnapshot().current.items[5];
+    const selected = flow.getSnapshot().mainFrame.items[5];
     if (!selected) throw new Error("Missing selected result.");
     flow.setActive(selected.candidateId);
     flow.openActions();
@@ -596,7 +601,7 @@ describe("CmdFlow and persistent ranking integration", () => {
     flow.open();
     flow.setQuery("github");
     await waitForFlow(flow, () => flow.getSnapshot().rankingReady);
-    const selected = flow.getSnapshot().current.items[5];
+    const selected = flow.getSnapshot().mainFrame.items[5];
     if (!selected) throw new Error("Missing selected result.");
     flow.setActive(selected.candidateId);
     await flow.invoke();

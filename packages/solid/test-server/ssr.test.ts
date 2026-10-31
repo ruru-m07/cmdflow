@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createCmdFlow } from "@cmdflow/core";
+import { type CmdFlowResolvedItem, createCmdFlow } from "@cmdflow/core";
 import { createComponent } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { Command } from "../src/index.js";
@@ -14,7 +14,7 @@ test("Solid SSR uses the same cached core snapshot without DOM access", () => {
   flow.setQuery("Linear");
   const html = renderToString(() =>
     createComponent(Command.Root, {
-      store: flow,
+      flow,
       get children() {
         return createComponent(Command.Dialog, {
           "aria-label": "Server commands",
@@ -22,7 +22,7 @@ test("Solid SSR uses the same cached core snapshot without DOM access", () => {
             return [
               createComponent(Command.Input, { "aria-label": "Search" }),
               createComponent(Command.List, {
-                children: (item) => createComponent(Command.Item, { item }),
+                children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
               }),
             ];
           },
