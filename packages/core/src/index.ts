@@ -1,3 +1,8 @@
+export * from "./contracts/definitions.js";
+export * from "./contracts/flow.js";
+export * from "./contracts/primitives.js";
+export * from "./contracts/snapshots.js";
+export { createCmdFlow } from "./create-flow.js";
 export {
   createCandidateId,
   createContextStore,
@@ -6,18 +11,34 @@ export {
 } from "./identity.js";
 export * from "./ranking.js";
 export * from "./ranking-types.js";
-export { createCmdFlow } from "./store.js";
-export * from "./types.js";
 
 import type {
-  ActionDefinition,
-  CommandDefinition,
-  ExtensionDefinition,
-  ViewDefinition,
-} from "./types.js";
+  CmdFlowActionDefinition,
+  CmdFlowCommandDefinition,
+  CmdFlowExtensionDefinition,
+  CmdFlowViewDefinition,
+} from "./contracts/definitions.js";
 
-export const defineCommand = <T>(command: CommandDefinition<T>): CommandDefinition<T> => command;
-export const defineAction = <T>(action: ActionDefinition<T>): ActionDefinition<T> => action;
-export const defineExtension = <T>(extension: ExtensionDefinition<T>): ExtensionDefinition<T> =>
-  extension;
-export const defineView = <T>(view: ViewDefinition<T>): ViewDefinition<T> => view;
+export function defineCommand<TContext = unknown, TData = unknown>(
+  command: CmdFlowCommandDefinition<TContext, TData>,
+): CmdFlowCommandDefinition<TContext, TData> {
+  return command;
+}
+
+export function defineAction<TContext = unknown, TData = unknown>(
+  action: CmdFlowActionDefinition<TContext, TData>,
+): CmdFlowActionDefinition<TContext, TData> {
+  return action;
+}
+
+export function defineExtension<TContext = unknown, TData = unknown>(
+  extension: CmdFlowExtensionDefinition<TContext, TData>,
+): CmdFlowExtensionDefinition<TContext, TData> {
+  return extension;
+}
+
+export function defineView<TContext = unknown, TData = unknown>(
+  view: CmdFlowViewDefinition<TContext, TData>,
+): CmdFlowViewDefinition<TContext, TData> {
+  return view;
+}

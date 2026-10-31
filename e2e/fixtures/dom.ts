@@ -1,8 +1,8 @@
 import {
+  type CmdFlowFrameSnapshot,
   type CmdFlowSnapshot,
+  type CmdFlowSurfaceAddress,
   createCmdFlow,
-  type FrameSnapshot,
-  type SurfaceAddress,
 } from "../../packages/core/dist/index.js";
 import { createDomController } from "../../packages/dom/dist/index.js";
 
@@ -94,20 +94,23 @@ const store = createCmdFlow({
     {
       id: "alpha",
       title: "Alpha",
+      action: {
+        type: "run",
+        id: "open-alpha",
+        title: "Open Alpha",
+        priority: "primary",
+        run: () => {
+          runs.push("alpha");
+        },
+      },
       actions: [
         {
-          id: "open-alpha",
-          title: "Open Alpha",
-          priority: "primary",
-          run: () => {
-            runs.push("alpha");
-          },
-        },
-        {
+          type: "submenu",
           id: "more",
           title: "More actions",
-          children: [
+          actions: [
             {
+              type: "run",
               id: "nested",
               title: "Nested action",
               run: () => {
@@ -117,6 +120,7 @@ const store = createCmdFlow({
           ],
         },
         {
+          type: "run",
           id: "delete",
           title: "Delete Alpha",
           destructive: true,
@@ -130,15 +134,25 @@ const store = createCmdFlow({
       id: "beta",
       title: "Beta",
       disabled: { reason: "Connect your account" },
-      run: () => {
-        runs.push("beta");
+      action: {
+        type: "run",
+        id: "open",
+        title: "Open",
+        run: () => {
+          runs.push("beta");
+        },
       },
     },
     {
       id: "gamma",
       title: "Gamma",
-      run: () => {
-        runs.push("gamma");
+      action: {
+        type: "run",
+        id: "open",
+        title: "Open",
+        run: () => {
+          runs.push("gamma");
+        },
       },
     },
   ],
@@ -165,8 +179,8 @@ function attributes(node: HTMLElement, props: object) {
   }
 }
 
-function renderSurface(frame: FrameSnapshot, input: HTMLInputElement, list: HTMLElement) {
-  const address: SurfaceAddress = { surface: frame.surface, frameId: frame.id };
+function renderSurface(frame: CmdFlowFrameSnapshot, input: HTMLInputElement, list: HTMLElement) {
+  const address: CmdFlowSurfaceAddress = { surface: frame.surface, frameId: frame.id };
   const previous = surfaceBindings.get(frame.surface);
   if (previous?.frameId !== frame.id) {
     previous?.cleanup();
@@ -195,7 +209,7 @@ function render() {
   for (const cleanup of bindings) cleanup();
   bindings = [];
   const snapshot = store.getSnapshot();
-  renderSurface(snapshot.current, mainInput, mainList);
+  renderSurface(snapshot.mainFrame, mainInput, mainList);
   actions.hidden = snapshot.actionFrame === null;
   if (snapshot.actionFrame) renderSurface(snapshot.actionFrame, actionsInput, actionsList);
   else {
@@ -207,7 +221,7 @@ function render() {
   attributes(trigger, controller.getActionsTriggerProps(snapshot));
   attributes(close, controller.getCloseProps(snapshot));
   attributes(confirmation, controller.getConfirmationProps(snapshot));
-  actionBack.hidden = snapshot.actions.length < 2;
+  actionBack.hidden = snapshot.actionFrames.length < 2;
   controller.sync(snapshot);
   output.textContent = runs.join(",");
 }

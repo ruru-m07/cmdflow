@@ -98,17 +98,23 @@ import { createComponent } from "solid-js";
 import { renderToString as renderSolid } from "solid-js/web";
 
 assert.equal(typeof document, "undefined", "this smoke must execute without DOM globals");
-const flow = createCmdFlow({ commands: [{ id: "smoke", title: "Packed command", run() {} }] });
+const flow = createCmdFlow({
+  commands: [{
+    id: "smoke",
+    title: "Packed command",
+    action: { type: "run", id: "run", title: "Run packed command", run() {} },
+  }],
+});
 const dom = createDomController(flow);
 assert.equal(dom.getInputProps().role, "combobox");
-const reactHTML = renderReact(createElement(ReactCommand.Root, { store: flow },
+const reactHTML = renderReact(createElement(ReactCommand.Root, { flow },
   createElement(ReactCommand.Dialog, { "aria-label": "Packed React palette" },
     createElement(ReactCommand.Input),
     createElement(ReactCommand.List, { children: (item) => createElement(ReactCommand.Item, { key: item.candidateId, item }) }))));
 assert.match(reactHTML, /Packed command/);
 assert.match(reactHTML, /role="combobox"/);
 const solidHTML = renderSolid(() => createComponent(SolidCommand.Root, {
-  store: flow,
+  flow,
   get children() { return createComponent(SolidCommand.Dialog, {
     "aria-label": "Packed Solid palette",
     get children() { return [createComponent(SolidCommand.Input, {}),
@@ -152,14 +158,26 @@ console.log("Packed packages: Node SSR, React/Solid rendering, exports, CSS, and
 import { createCmdFlow, type CmdFlowSnapshot } from "@cmdflow/core";
 import { createDomController } from "@cmdflow/dom";
 import { createIndexedDBRankingStore } from "@cmdflow/dom/persistence";
-import { Command as ReactCommand, useCmdflowSelector } from "@cmdflow/react";
-import { Command as SolidCommand, createCmdflow } from "@cmdflow/solid";
-const flow = createCmdFlow({ context: { workspace: "smoke" }, commands: [{ id: "typed", title: "Typed command", run: ({ appContext }) => { appContext.workspace.toUpperCase(); } }] });
+import { Command as ReactCommand, useCmdFlowSelector } from "@cmdflow/react";
+import { Command as SolidCommand, createCmdFlowSelector } from "@cmdflow/solid";
+const flow = createCmdFlow({
+  context: { workspace: "smoke" },
+  commands: [{
+    id: "typed",
+    title: "Typed command",
+    action: {
+      type: "run",
+      id: "run",
+      title: "Run typed command",
+      run: ({ appContext }) => { appContext.workspace.toUpperCase(); },
+    },
+  }],
+});
 const snapshot: CmdFlowSnapshot = flow.getSnapshot();
 const dom = createDomController(flow);
 dom.getInputProps("main", snapshot);
 const persistence = createIndexedDBRankingStore({ indexedDB: null });
-void [ReactCommand, SolidCommand, useCmdflowSelector, createCmdflow, persistence];
+void [ReactCommand, SolidCommand, useCmdFlowSelector, createCmdFlowSelector, persistence];
 `,
   );
   await writeFile(

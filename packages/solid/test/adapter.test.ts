@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type CmdFlow, createCmdFlow } from "@cmdflow/core";
+import { type CmdFlow, type CmdFlowResolvedItem, createCmdFlow } from "@cmdflow/core";
 import {
   type HTMLElement as HappyHTMLElement,
   type HTMLInputElement as HappyHTMLInputElement,
   Window,
 } from "happy-dom";
-import { createComponent, createEffect } from "solid-js";
+import { type Accessor, createComponent, createEffect } from "solid-js";
 import { render } from "solid-js/web";
-import { type CmdflowBinding, Command, createCmdflowSelector, useCmdflow } from "../src/index.js";
+import { Command, createCmdFlowSelector, useCmdFlow } from "../src/index.js";
 
 const browser = new Window({ url: "https://cmdflow.test" });
 Object.assign(globalThis, {
@@ -38,11 +38,19 @@ function flowWithItems(onRun = () => {}) {
       {
         id: "github",
         title: "GitHub",
-        run: onRun,
-        actions: [{ id: "copy", title: "Copy GitHub URL", run: onRun }],
+        action: { type: "run", id: "open-github", title: "Open GitHub", run: onRun },
+        actions: [{ type: "run", id: "copy", title: "Copy GitHub URL", run: onRun }],
       },
-      { id: "issues", title: "GitHub Issues", run: onRun },
-      { id: "linear", title: "Linear", run: onRun },
+      {
+        id: "issues",
+        title: "GitHub Issues",
+        action: { type: "run", id: "open-issues", title: "Open GitHub Issues", run: onRun },
+      },
+      {
+        id: "linear",
+        title: "Linear",
+        action: { type: "run", id: "open-linear", title: "Open Linear", run: onRun },
+      },
     ],
   });
 }
@@ -54,15 +62,15 @@ function parts() {
       return [
         createComponent(Command.Input, { "aria-label": "Find a command" }),
         createComponent(Command.List, {
-          children: (item) => createComponent(Command.Item, { item }),
+          children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
         }),
-        createComponent(Command.ActionsTrigger, { children: "Actions" }),
-        createComponent(Command.Actions, {
+        createComponent(Command.ActionPanelTrigger, { children: "Actions" }),
+        createComponent(Command.ActionPanel, {
           get children() {
             return [
               createComponent(Command.Input, { "aria-label": "Find an action" }),
               createComponent(Command.List, {
-                children: (item) => createComponent(Command.Item, { item }),
+                children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
               }),
             ];
           },
@@ -80,7 +88,7 @@ function mount<T>(flow: CmdFlow<T>, children = parts) {
   dispose = render(
     () =>
       createComponent(Command.Root, {
-        store: flow,
+        flow,
         get children() {
           return children();
         },
@@ -103,7 +111,7 @@ function getId(host: HappyHTMLElement, selector: string): string {
 }
 
 describe("Solid adapter conformance", () => {
-  test("runtime native open and initial input values cannot bypass the store", () => {
+  test("runtime native open and initial input values cannot bypass the flow", () => {
     const flow = flowWithItems();
     const unsafeDialogProps = { open: true };
     const unsafeInputProps = {
@@ -118,7 +126,7 @@ describe("Solid adapter conformance", () => {
           return [
             createComponent(Command.Input, unsafeInputProps),
             createComponent(Command.List, {
-              children: (item) => createComponent(Command.Item, { item }),
+              children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
             }),
           ];
         },
@@ -142,7 +150,7 @@ describe("Solid adapter conformance", () => {
       createComponent(Command.Dialog, {
         get children() {
           return createComponent(Command.List, {
-            children: (item, index) => {
+            children: (item: CmdFlowResolvedItem, index: Accessor<number>) => {
               const copy = { ...item };
               titles.push(copy.title);
               expect(typeof index).toBe("function");
@@ -171,8 +179,8 @@ describe("Solid adapter conformance", () => {
     input?.dispatchEvent(
       new browser.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
     );
-    expect(flow.getSnapshot().current.activeId).toBe(
-      flow.getSnapshot().current.items[1]?.candidateId ?? null,
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(
+      flow.getSnapshot().mainFrame.items[1]?.candidateId ?? null,
     );
     expect(input?.getAttribute("aria-activedescendant")).toBe(
       getId(host, '[role="option"][data-state="active"]'),
@@ -199,7 +207,7 @@ describe("Solid adapter conformance", () => {
     if (actionInput) actionInput.value = "Copy";
     actionInput?.dispatchEvent(new browser.Event("input", { bubbles: true }));
     expect(flow.getSnapshot().actionFrame?.query).toBe("Copy");
-    expect(flow.getSnapshot().current.query).toBe("GitHub");
+    expect(flow.getSnapshot().mainFrame.query).toBe("GitHub");
     flow.closeActions();
     expect(browser.document.activeElement).toBe(mainInput);
     flow.push({
@@ -211,7 +219,7 @@ describe("Solid adapter conformance", () => {
     expect(browser.document.activeElement).toBe(mainInput);
     if (mainInput) mainInput.value = "Nested";
     mainInput?.dispatchEvent(new browser.Event("input", { bubbles: true }));
-    expect(flow.getSnapshot().current.query).toBe("Nested");
+    expect(flow.getSnapshot().mainFrame.query).toBe("Nested");
     expect(mainInput?.getAttribute("aria-controls")).toBe(getId(host, '[role="listbox"]'));
     flow.pop("main");
     expect(mainInput?.value).toBe("GitHub");
@@ -226,24 +234,24 @@ describe("Solid adapter conformance", () => {
           return [
             createComponent(Command.Input, { onKeyDown: (event) => event.preventDefault() }),
             createComponent(Command.List, {
-              children: (item) => createComponent(Command.Item, { item }),
+              children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
             }),
           ];
         },
       }),
     );
     flow.open();
-    const initial = flow.getSnapshot().current.activeId;
+    const initial = flow.getSnapshot().mainFrame.activeId;
     host
       .querySelector("input")
       ?.dispatchEvent(
         new browser.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
       );
-    expect(flow.getSnapshot().current.activeId).toBe(initial);
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(initial);
     flow.destroy();
   });
 
-  test("selectors suppress unrelated work, and disposal unsubscribes without owning the store", () => {
+  test("selectors suppress unrelated work, and disposal unsubscribes without owning the flow", () => {
     const flow = flowWithItems();
     let subscriberCount = 0;
     const subscribe = flow.subscribe;
@@ -256,12 +264,12 @@ describe("Solid adapter conformance", () => {
       };
     };
     let changes = 0;
-    let binding: CmdflowBinding | undefined;
+    let boundFlow: CmdFlow<unknown> | undefined;
     mount(flow, () => {
-      binding = useCmdflow();
-      const selection = createCmdflowSelector(
+      boundFlow = useCmdFlow();
+      const selection = createCmdFlowSelector(
         (snapshot) => ({ open: snapshot.open }),
-        binding,
+        boundFlow,
         (left, right) => left.open === right.open,
       );
       createEffect(() => {
@@ -276,7 +284,7 @@ describe("Solid adapter conformance", () => {
     flow.open();
     expect(changes).toBe(previous + 1);
     expect(subscriberCount).toBe(1);
-    expect(binding?.snapshot()).toBe(flow.getSnapshot());
+    expect(boundFlow).toBe(flow);
     dispose?.();
     dispose = undefined;
     expect(subscriberCount).toBe(0);

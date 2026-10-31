@@ -37,7 +37,7 @@ async function audit(page: Page, testInfo: TestInfo, state: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /Open command panel/ }).click();
+  await page.getByRole("button", { name: /Open Command Palette/ }).click();
   await expect(search(page)).toBeFocused();
 });
 
@@ -65,7 +65,7 @@ test("native form and inline validation satisfy automated WCAG 2.1 A/AA checks",
   await expect(title).toBeFocused();
   await audit(page, testInfo, "form");
   await title.fill("abc");
-  await page.getByRole("button", { name: "Create pull request", exact: true }).click();
+  await page.getByRole("button", { name: "Create Pull Request", exact: true }).click();
   await expect(title).toHaveAttribute("aria-invalid", "true");
   await audit(page, testInfo, "form-validation-error");
 });

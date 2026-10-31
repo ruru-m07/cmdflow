@@ -1,4 +1,8 @@
-import type { CandidateId, MutableContextStore, Surface } from "./types.js";
+import type {
+  CandidateId,
+  CmdFlowSurface,
+  MutableCmdFlowContextStore,
+} from "./contracts/primitives.js";
 
 export function createCandidateId(sourceId: string, itemId: string): CandidateId {
   return JSON.stringify([sourceId, itemId]) as CandidateId;
@@ -7,7 +11,7 @@ export function createCandidateId(sourceId: string, itemId: string): CandidateId
 /** Opaque collision-safe key used by ranking reset/load APIs for one logical view. */
 export function createRankingSurfaceId(
   surfaceId: string,
-  surface: Surface,
+  surface: CmdFlowSurface,
   viewId: string,
 ): string {
   return JSON.stringify([surfaceId, surface, viewId]);
@@ -25,7 +29,7 @@ export function parseCandidateId(id: CandidateId): readonly [string, string] {
   return Object.freeze([value[0] as string, value[1] as string]);
 }
 
-export function createContextStore<T>(initial: T): MutableContextStore<T> {
+export function createContextStore<T>(initial: T): MutableCmdFlowContextStore<T> {
   let value = initial;
   const listeners = new Set<() => void>();
   return {

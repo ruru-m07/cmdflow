@@ -1,12 +1,23 @@
 # Learned ranking persistence
 
-CmdFlow learns from successful executions. Its default store is ephemeral memory; install the
-optional browser adapter when preferences should survive a reload. The core package remains free
-of browser storage dependencies.
+CmdFlow learns from successful executions. Its default store is ephemeral memory; use the optional
+browser persistence entrypoint when preferences should survive a reload. The core package remains
+free of browser storage dependencies.
+
+Import persistence through the package that owns the integration:
+
+| Integration | Persistence entrypoint |
+| --- | --- |
+| React | `@cmdflow/react/persistence` |
+| Solid | `@cmdflow/solid/persistence` |
+| Vanilla DOM | `@cmdflow/dom/persistence` |
+
+The React and Solid subpaths re-export the same SSR-safe persistence API, so framework applications
+do not need to install or import `@cmdflow/dom` directly.
 
 ```ts
-import { createCmdFlow } from "@cmdflow/core";
-import { createIndexedDBRankingStore } from "@cmdflow/dom/persistence";
+import { createCmdFlow } from "@cmdflow/react";
+import { createIndexedDBRankingStore } from "@cmdflow/react/persistence";
 
 const storage = createIndexedDBRankingStore({
   databaseName: "my-product-command-history",
@@ -20,7 +31,12 @@ const flow = createCmdFlow({
     {
       id: "github-issues",
       title: "GitHub issues",
-      run: () => ({ type: "stay" }),
+      action: {
+        type: "run",
+        id: "open",
+        title: "Open GitHub issues",
+        run: () => ({ type: "stay" }),
+      },
     },
   ],
   ranking: {

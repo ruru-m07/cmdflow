@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createCandidateId, createCmdFlow, createContextStore } from "../src/index.js";
 import type {
-  CmdFlow,
-  FinalResultBatch,
-  ResultBatch,
-  ResultSource,
-  SearchRequest,
-} from "../src/types.js";
+  CmdFlowFinalResultBatch,
+  CmdFlowResultBatch,
+  CmdFlowResultSource,
+  CmdFlowSearchRequest,
+} from "../src/contracts/definitions.js";
+import type { CmdFlow } from "../src/contracts/flow.js";
+import { createCandidateId, createCmdFlow, createContextStore } from "../src/index.js";
 
 type Context = Record<string, never>;
 const flows = new Set<{ destroy(): void }>();
@@ -31,17 +31,17 @@ function deferred<T>() {
 
 /** A controllable producer that deliberately continues yielding after cancellation. */
 function stream<T = Context>() {
-  const queued: IteratorResult<ResultBatch<T>>[] = [];
-  let pending: ReturnType<typeof deferred<IteratorResult<ResultBatch<T>>>> | undefined;
+  const queued: IteratorResult<CmdFlowResultBatch<T>>[] = [];
+  let pending: ReturnType<typeof deferred<IteratorResult<CmdFlowResultBatch<T>>>> | undefined;
   let returns = 0;
-  const iterator: AsyncIterableIterator<ResultBatch<T>> = {
+  const iterator: AsyncIterableIterator<CmdFlowResultBatch<T>> = {
     [Symbol.asyncIterator]() {
       return this;
     },
     next() {
       const queuedItem = queued.shift();
       if (queuedItem) return Promise.resolve(queuedItem);
-      pending = deferred<IteratorResult<ResultBatch<T>>>();
+      pending = deferred<IteratorResult<CmdFlowResultBatch<T>>>();
       return pending.promise;
     },
     return() {
@@ -49,7 +49,7 @@ function stream<T = Context>() {
       return Promise.resolve({ done: true, value: undefined });
     },
   };
-  function deliver(next: IteratorResult<ResultBatch<T>>) {
+  function deliver(next: IteratorResult<CmdFlowResultBatch<T>>) {
     if (pending) {
       const waiter = pending;
       pending = undefined;
@@ -58,7 +58,7 @@ function stream<T = Context>() {
   }
   return {
     iterator,
-    emit(batch: ResultBatch<T>) {
+    emit(batch: CmdFlowResultBatch<T>) {
       deliver({ done: false, value: batch });
     },
     finish() {
@@ -71,7 +71,7 @@ function stream<T = Context>() {
 }
 
 function itemIds(flow: Pick<CmdFlow, "getSnapshot">): string[] {
-  return flow.getSnapshot().current.items.map((item) => item.id);
+  return flow.getSnapshot().mainFrame.items.map((item) => item.id);
 }
 
 describe("streamed result source conformance", () => {
@@ -95,7 +95,7 @@ describe("streamed result source conformance", () => {
     });
     await settle();
     expect(itemIds(flow).sort()).toEqual(["a", "b", "registry"]);
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("loading");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("loading");
     const b = createCandidateId("stream", "b");
     flow.setActive(b);
     flow.setScrollAnchor({ candidateId: b, offset: 12 });
@@ -110,9 +110,9 @@ describe("streamed result source conformance", () => {
     });
     await settle();
     expect(itemIds(flow).sort()).toEqual(["b", "c", "registry"]);
-    expect(flow.getSnapshot().current.activeId).toBe(b);
-    expect(flow.getSnapshot().current.scrollAnchor).toEqual({ candidateId: b, offset: 12 });
-    expect(flow.getSnapshot().current.items.find((item) => item.id === "b")?.title).toBe(
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(b);
+    expect(flow.getSnapshot().mainFrame.scrollAnchor).toEqual({ candidateId: b, offset: 12 });
+    expect(flow.getSnapshot().mainFrame.items.find((item) => item.id === "b")?.title).toBe(
       "Updated B",
     );
     producer.emit({ operation: "replace", items: [{ id: "d", title: "D" }], done: false });
@@ -127,8 +127,8 @@ describe("streamed result source conformance", () => {
       done: true,
     });
     await settle();
-    expect(flow.getSnapshot().current.items.find((item) => item.id === "d")?.title).toBe("Last");
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.items.find((item) => item.id === "d")?.title).toBe("Last");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
     expect(diagnostics).toContain("duplicate-source-item");
     expect(producer.returnCalls).toBe(1);
   });
@@ -146,16 +146,16 @@ describe("streamed result source conformance", () => {
     await settle();
     producer.finish();
     await settle();
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
-    expect(flow.getSnapshot().current.sources[0]?.nextCursor).toBeUndefined();
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.nextCursor).toBeUndefined();
     expect(itemIds(flow)).toEqual(["a"]);
     expect(diagnostics.filter((type) => type === "source-missing-final")).toHaveLength(1);
   });
 
   test("late page results cannot replace a newer query or restore its old cursor", async () => {
-    const oldPage = deferred<FinalResultBatch<Context>>();
-    const newQuery = deferred<FinalResultBatch<Context>>();
-    const requests: SearchRequest<Context>[] = [];
+    const oldPage = deferred<CmdFlowFinalResultBatch<Context>>();
+    const newQuery = deferred<CmdFlowFinalResultBatch<Context>>();
+    const requests: CmdFlowSearchRequest<Context>[] = [];
     const flow = createCmdFlow({
       sources: [
         {
@@ -179,7 +179,7 @@ describe("streamed result source conformance", () => {
     flow.open();
     flow.setQuery("old");
     await settle();
-    const oldEpoch = flow.getSnapshot().current.sources[0]?.searchEpoch;
+    const oldEpoch = flow.getSnapshot().mainFrame.sources[0]?.searchEpoch;
     const pendingPage = flow.loadMore("remote");
     const pageRequest = requests.find((request) => request.cursor === "old-page-2");
     flow.setQuery("new");
@@ -200,20 +200,20 @@ describe("streamed result source conformance", () => {
     await pendingPage;
     await settle();
     expect(itemIds(flow)).toEqual(["new-1"]);
-    expect(flow.getSnapshot().current.sources[0]).toMatchObject({
+    expect(flow.getSnapshot().mainFrame.sources[0]).toMatchObject({
       status: "success",
       nextCursor: "new-page-2",
     });
-    expect(flow.getSnapshot().current.sources[0]?.searchEpoch).toBeGreaterThan(oldEpoch ?? 0);
+    expect(flow.getSnapshot().mainFrame.sources[0]?.searchEpoch).toBeGreaterThan(oldEpoch ?? 0);
   });
 
   test("context replacement aborts the old request even when its query is unchanged", async () => {
     const context = createContextStore({ workspace: "first" });
     const pending = new Map<
       string,
-      ReturnType<typeof deferred<FinalResultBatch<{ workspace: string }>>>
+      ReturnType<typeof deferred<CmdFlowFinalResultBatch<{ workspace: string }>>>
     >();
-    const requests: SearchRequest<{ workspace: string }>[] = [];
+    const requests: CmdFlowSearchRequest<{ workspace: string }>[] = [];
     const flow = createCmdFlow({
       context,
       sources: [
@@ -222,7 +222,7 @@ describe("streamed result source conformance", () => {
           minQueryLength: 1,
           search(request) {
             requests.push(request);
-            const response = deferred<FinalResultBatch<{ workspace: string }>>();
+            const response = deferred<CmdFlowFinalResultBatch<{ workspace: string }>>();
             pending.set(request.context.workspace, response);
             return response.promise;
           },
@@ -248,7 +248,7 @@ describe("streamed result source conformance", () => {
     });
     await settle();
     expect(itemIds(flow)).toEqual(["second"]);
-    expect(flow.getSnapshot().current.query).toBe("issue");
+    expect(flow.getSnapshot().mainFrame.query).toBe("issue");
   });
 
   test("a reentrant source-start diagnostic can close the panel before transport begins", async () => {
@@ -314,8 +314,8 @@ describe("streamed result source conformance", () => {
   );
 
   test("a synchronous iterator cleanup exception cannot prevent closing the panel", async () => {
-    const pending = deferred<IteratorResult<ResultBatch<Context>>>();
-    const iterable: AsyncIterableIterator<ResultBatch<Context>> = {
+    const pending = deferred<IteratorResult<CmdFlowResultBatch<Context>>>();
+    const iterable: AsyncIterableIterator<CmdFlowResultBatch<Context>> = {
       [Symbol.asyncIterator]() {
         return this;
       },
@@ -366,9 +366,9 @@ describe("streamed result source conformance", () => {
       done: true,
     });
     await settle();
-    expect(flow.getSnapshot().current.query).toBe("new");
+    expect(flow.getSnapshot().mainFrame.query).toBe("new");
     expect(itemIds(flow)).toEqual(["new"]);
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
   });
 
   test("a page error preserves previous results and retry cursor, then clears the error on success", async () => {
@@ -378,7 +378,9 @@ describe("streamed result source conformance", () => {
       sources: [
         {
           id: "remote",
-          search({ cursor }) {
+          search({
+            cursor,
+          }): CmdFlowFinalResultBatch<Context> | Promise<CmdFlowFinalResultBatch<Context>> {
             calls += 1;
             if (!cursor)
               return {
@@ -399,22 +401,22 @@ describe("streamed result source conformance", () => {
     await settle();
     await flow.loadMore("remote");
     expect(itemIds(flow)).toEqual(["one"]);
-    expect(flow.getSnapshot().current.sources[0]).toMatchObject({
+    expect(flow.getSnapshot().mainFrame.sources[0]).toMatchObject({
       status: "error",
       error: "Temporary failure",
       nextCursor: "two",
     });
     await flow.loadMore("remote");
     expect(itemIds(flow)).toEqual(["one", "two"]);
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
-    expect(flow.getSnapshot().current.sources[0]?.error).toBeUndefined();
-    expect(flow.getSnapshot().current.sources[0]?.nextCursor).toBeUndefined();
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.error).toBeUndefined();
+    expect(flow.getSnapshot().mainFrame.sources[0]?.nextCursor).toBeUndefined();
     await flow.loadMore("remote");
     expect(calls).toBe(3);
     flow.refresh();
     await settle();
     expect(itemIds(flow)).toEqual(["one"]);
-    expect(flow.getSnapshot().current.sources[0]?.nextCursor).toBe("two");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.nextCursor).toBe("two");
   });
 
   test("an invalid paginated replacement errors without deleting previously loaded items", async () => {
@@ -440,7 +442,7 @@ describe("streamed result source conformance", () => {
     await settle();
     await flow.loadMore("remote");
     expect(itemIds(flow)).toEqual(["one"]);
-    expect(flow.getSnapshot().current.sources[0]).toMatchObject({
+    expect(flow.getSnapshot().mainFrame.sources[0]).toMatchObject({
       status: "error",
       nextCursor: "two",
     });
@@ -448,31 +450,31 @@ describe("streamed result source conformance", () => {
 
   test("a synchronous non-final response fails clearly and a refresh can recover", async () => {
     let broken = true;
-    const source: ResultSource<Context> = {
+    const source: CmdFlowResultSource<Context> = {
       id: "remote",
       search: () =>
         ({
           operation: "replace",
           items: [{ id: "one", title: "One" }],
           done: !broken,
-        }) as FinalResultBatch<Context>,
+        }) as CmdFlowFinalResultBatch<Context>,
     };
     const flow = createCmdFlow({ sources: [source] });
     flows.add(flow);
     flow.open();
     await settle();
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("error");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("error");
     expect(itemIds(flow)).toEqual([]);
     broken = false;
     flow.refresh();
     await settle();
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
     expect(itemIds(flow)).toEqual(["one"]);
   });
 
   test("a final batch remains successful even when iterator cleanup rejects", async () => {
     let returned = 0;
-    const iterable: AsyncIterableIterator<ResultBatch<Context>> = {
+    const iterable: AsyncIterableIterator<CmdFlowResultBatch<Context>> = {
       [Symbol.asyncIterator]() {
         return this;
       },
@@ -491,6 +493,6 @@ describe("streamed result source conformance", () => {
     await settle();
     expect(itemIds(flow)).toEqual(["one"]);
     expect(returned).toBe(1);
-    expect(flow.getSnapshot().current.sources[0]?.status).toBe("success");
+    expect(flow.getSnapshot().mainFrame.sources[0]?.status).toBe("success");
   });
 });

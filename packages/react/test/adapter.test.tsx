@@ -8,7 +8,7 @@ import {
 import { act, createElement, createRef, StrictMode } from "react";
 import { createRoot, hydrateRoot, type Root as ReactRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { Command, composeRefs, useCmdflowSelector } from "../src/index.js";
+import { Command, composeRefs, useCmdFlowSelector, useCmdflow } from "../src/index.js";
 
 const browser = new Window({ url: "https://cmdflow.test" });
 Object.assign(globalThis, {
@@ -40,11 +40,19 @@ function flowWithItems(onRun = () => {}) {
       {
         id: "github",
         title: "GitHub",
-        run: onRun,
-        actions: [{ id: "copy", title: "Copy GitHub URL", run: onRun }],
+        action: { type: "run", id: "open-github", title: "Open GitHub", run: onRun },
+        actions: [{ type: "run", id: "copy", title: "Copy GitHub URL", run: onRun }],
       },
-      { id: "issues", title: "GitHub Issues", run: onRun },
-      { id: "linear", title: "Linear", run: onRun },
+      {
+        id: "issues",
+        title: "GitHub Issues",
+        action: { type: "run", id: "open-issues", title: "Open GitHub Issues", run: onRun },
+      },
+      {
+        id: "linear",
+        title: "Linear",
+        action: { type: "run", id: "open-linear", title: "Open Linear", run: onRun },
+      },
     ],
   });
 }
@@ -54,11 +62,11 @@ function Parts() {
     <Command.Dialog aria-label="Application commands">
       <Command.Input aria-label="Find a command" />
       <Command.List>{(item) => <Command.Item key={item.candidateId} item={item} />}</Command.List>
-      <Command.ActionsTrigger>Actions</Command.ActionsTrigger>
-      <Command.Actions>
+      <Command.ActionPanelTrigger>Actions</Command.ActionPanelTrigger>
+      <Command.ActionPanel>
         <Command.Input aria-label="Find an action" />
         <Command.List>{(item) => <Command.Item key={item.candidateId} item={item} />}</Command.List>
-      </Command.Actions>
+      </Command.ActionPanel>
       <Command.Status />
       <Command.Close>Close</Command.Close>
     </Command.Dialog>
@@ -86,7 +94,36 @@ function getId(host: HappyHTMLElement, selector: string): string {
 }
 
 describe("React adapter conformance", () => {
-  test("runtime native open and initial input values cannot bypass the store", async () => {
+  test("deprecated Root and selector aliases remain a working migration bridge", async () => {
+    const flow = flowWithItems();
+    function LegacyConsumer() {
+      const binding = useCmdflow();
+      return (
+        <output
+          data-same-store={binding.store === flow}
+          data-current-alias={binding.snapshot.current === binding.snapshot.mainFrame}
+          data-main-alias={binding.snapshot.main === binding.snapshot.mainFrames}
+        >
+          {binding.snapshot.current.query}
+        </output>
+      );
+    }
+    const host = await mount(
+      <Command.Root store={flow}>
+        <Parts />
+        <LegacyConsumer />
+      </Command.Root>,
+    );
+    const legacy = host.querySelector("output");
+    expect(legacy?.dataset.sameStore).toBe("true");
+    expect(legacy?.dataset.currentAlias).toBe("true");
+    expect(legacy?.dataset.mainAlias).toBe("true");
+    await act(() => flow.setQuery("GitHub"));
+    expect(legacy?.textContent).toBe("GitHub");
+    await act(() => flow.destroy());
+  });
+
+  test("runtime native open and initial input values cannot bypass the flow", async () => {
     const flow = flowWithItems();
     const unsafeDialogProps = { open: true };
     const unsafeInputProps = {
@@ -95,7 +132,7 @@ describe("React adapter conformance", () => {
       defaultValue: "forced default",
     };
     const host = await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Command.Dialog {...unsafeDialogProps}>
           <Command.Input {...unsafeInputProps} />
           <Command.List>
@@ -140,7 +177,7 @@ describe("React adapter conformance", () => {
     const flow = flowWithItems();
     let rowsRendered = 0;
     await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Command.Dialog>
           <Command.Input />
           <Command.List>
@@ -161,7 +198,7 @@ describe("React adapter conformance", () => {
   test("hydration preserves server markup and then adopts the current client snapshot", async () => {
     const flow = flowWithItems();
     const content = (
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Parts />
       </Command.Root>
     );
@@ -189,7 +226,7 @@ describe("React adapter conformance", () => {
         type: "form",
         title: "Create pull request",
         fields: [
-          { id: "title", label: "Title", required: true },
+          { id: "title", label: "Title", type: "text", required: true },
           { id: "body", label: "Description", type: "textarea" },
           {
             id: "base",
@@ -200,6 +237,7 @@ describe("React adapter conformance", () => {
           },
         ],
         submit: {
+          type: "run",
           id: "submit",
           title: "Create",
           run: ({ values }) => {
@@ -209,7 +247,7 @@ describe("React adapter conformance", () => {
       },
     });
     const host = await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Command.Dialog>
           <Command.Form>
             <Command.FieldLabel fieldId="title" />
@@ -256,10 +294,10 @@ describe("React adapter conformance", () => {
     expect(flow.getServerSnapshot()).toBe(initial);
     const html = renderToString(
       <>
-        <Command.Root store={flow}>
+        <Command.Root flow={flow}>
           <Parts />
         </Command.Root>
-        <Command.Root store={flow}>
+        <Command.Root flow={flow}>
           <Parts />
         </Command.Root>
       </>,
@@ -281,7 +319,7 @@ describe("React adapter conformance", () => {
     });
     const inputRef = createRef<HTMLInputElement>();
     const host = await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Command.Dialog aria-label="Custom title">
           <Command.Input
             ref={inputRef}
@@ -309,8 +347,8 @@ describe("React adapter conformance", () => {
         new browser.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
       );
     });
-    const active = flow.getSnapshot().current.activeId;
-    expect(active).toBe(flow.getSnapshot().current.items[1]?.candidateId ?? null);
+    const active = flow.getSnapshot().mainFrame.activeId;
+    expect(active).toBe(flow.getSnapshot().mainFrame.items[1]?.candidateId ?? null);
     expect(input?.getAttribute("aria-activedescendant")).toBe(
       getId(host, '[data-state="active"][role="option"]'),
     );
@@ -320,7 +358,7 @@ describe("React adapter conformance", () => {
         new browser.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
       );
     });
-    expect(flow.getSnapshot().current.activeId).toBe(active);
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(active);
     await act(async () => {
       input?.dispatchEvent(
         new browser.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
@@ -334,7 +372,7 @@ describe("React adapter conformance", () => {
   test("the actions surface has independent search and restores its trigger", async () => {
     const flow = flowWithItems();
     const host = await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Parts />
       </Command.Root>,
     );
@@ -354,23 +392,23 @@ describe("React adapter conformance", () => {
       actionInput?.dispatchEvent(new browser.Event("input", { bubbles: true }));
     });
     expect(flow.getSnapshot().actionFrame?.query).toBe("Copy");
-    expect(flow.getSnapshot().current.query).toBe("GitHub");
+    expect(flow.getSnapshot().mainFrame.query).toBe("GitHub");
     await act(() => flow.closeActions());
     expect(browser.document.activeElement === trigger).toBe(true);
-    expect(flow.getSnapshot().current.query).toBe("GitHub");
+    expect(flow.getSnapshot().mainFrame.query).toBe("GitHub");
     await act(() => flow.destroy());
   });
 
   test("IME input updates the visible query without handling navigation keys", async () => {
     const flow = flowWithItems();
     const host = await mount(
-      <Command.Root store={flow}>
+      <Command.Root flow={flow}>
         <Parts />
       </Command.Root>,
     );
     await act(() => flow.open());
     const input = getInput(host, 'input[aria-label="Find a command"]');
-    const originalActive = flow.getSnapshot().current.activeId;
+    const originalActive = flow.getSnapshot().mainFrame.activeId;
     await act(() => {
       input?.dispatchEvent(new browser.CompositionEvent("compositionstart", { bubbles: true }));
       if (input) input.value = "Git";
@@ -383,12 +421,12 @@ describe("React adapter conformance", () => {
         }),
       );
     });
-    expect(flow.getSnapshot().current.query).toBe("Git");
-    expect(flow.getSnapshot().current.activeId).toBe(originalActive);
+    expect(flow.getSnapshot().mainFrame.query).toBe("Git");
+    expect(flow.getSnapshot().mainFrame.activeId).toBe(originalActive);
     await act(() => {
       input?.dispatchEvent(new browser.CompositionEvent("compositionend", { bubbles: true }));
     });
-    expect(flow.getSnapshot().current.composing).toBe(false);
+    expect(flow.getSnapshot().mainFrame.composing).toBe(false);
     await act(() => flow.destroy());
   });
 
@@ -406,7 +444,7 @@ describe("React adapter conformance", () => {
     };
     let renders = 0;
     function OpenState() {
-      const selection = useCmdflowSelector(
+      const selection = useCmdFlowSelector(
         (snapshot) => ({ open: snapshot.open }),
         undefined,
         (left, right) => left.open === right.open,
@@ -416,7 +454,7 @@ describe("React adapter conformance", () => {
     }
     await mount(
       <StrictMode>
-        <Command.Root store={flow}>
+        <Command.Root flow={flow}>
           <Parts />
           <OpenState />
         </Command.Root>
@@ -431,7 +469,7 @@ describe("React adapter conformance", () => {
     expect(subscriptionCount).toBe(0);
     expect(flow.getSnapshot().destroyed).toBe(false);
     flow.setQuery("Linear");
-    expect(flow.getSnapshot().current.items[0]?.title).toBe("Linear");
+    expect(flow.getSnapshot().mainFrame.items[0]?.title).toBe("Linear");
     flow.destroy();
   });
 });

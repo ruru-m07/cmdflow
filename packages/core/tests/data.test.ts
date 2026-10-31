@@ -27,12 +27,23 @@ test("source relevance fallback and per-item personalization policy reach the en
   const flow = createCmdFlow({
     ranking: { store: storage, scope: { subjectKey: "test", surfaceId: "palette" } },
     commands: [
-      { id: "semantic", title: "Pull requests", allowFallback: true, personalize: false, run() {} },
+      {
+        id: "semantic",
+        title: "Pull requests",
+        allowFallback: true,
+        personalize: false,
+        action: {
+          type: "run",
+          id: "semantic",
+          title: "Pull requests",
+          run() {},
+        },
+      },
     ],
   });
   flow.open();
   flow.setQuery("github");
-  expect(flow.getSnapshot().current.items[0]?.id).toBe("semantic");
+  expect(flow.getSnapshot().mainFrame.items[0]?.id).toBe("semantic");
   await flow.invoke();
   for (let i = 0; i < 20; i++) await Promise.resolve();
   const profile = await storage.load({
@@ -46,13 +57,18 @@ test("source relevance fallback and per-item personalization policy reach the en
 test("replacing a dirty form requires confirmation", async () => {
   const flow = createCmdFlow();
   flow.open();
-  flow.push({ id: "form", type: "form", fields: [{ id: "title", label: "Title" }] });
+  flow.push({
+    id: "form",
+    type: "form",
+    fields: [{ id: "title", type: "text", label: "Title" }],
+    submit: { type: "run", id: "save", title: "Save", run() {} },
+  });
   flow.setField("title", "draft");
   flow.replace({ id: "next", type: "detail" });
-  expect(flow.getSnapshot().current.view.id).toBe("form");
+  expect(flow.getSnapshot().mainFrame.view.id).toBe("form");
   expect(flow.getSnapshot().confirmation?.kind).toBe("discard");
   await flow.confirm();
-  expect(flow.getSnapshot().current.view.id).toBe("next");
+  expect(flow.getSnapshot().mainFrame.view.id).toBe("next");
   flow.destroy();
 });
 
@@ -66,15 +82,24 @@ test("query ranking reuses static result metadata but reevaluates dynamic action
   let enabled = true;
   const flow = createCmdFlow({
     commands: [
-      { id: "static", title: "GitHub static", run() {} },
-      { id: "dynamic", title: "GitHub dynamic", enabled: () => enabled, run() {} },
+      {
+        id: "static",
+        title: "GitHub static",
+        action: { type: "run", id: "static", title: "GitHub static", run() {} },
+      },
+      {
+        id: "dynamic",
+        title: "GitHub dynamic",
+        enabled: () => enabled,
+        action: { type: "run", id: "dynamic", title: "GitHub dynamic", run() {} },
+      },
     ],
   });
-  const item = flow.getSnapshot().current.items.find((entry) => entry.id === "static");
+  const item = flow.getSnapshot().mainFrame.items.find((entry) => entry.id === "static");
   enabled = false;
   flow.setQuery("github");
-  expect(flow.getSnapshot().current.items.find((entry) => entry.id === "static")).toBe(item);
-  expect(flow.getSnapshot().current.items.find((entry) => entry.id === "dynamic")?.disabled).toBe(
+  expect(flow.getSnapshot().mainFrame.items.find((entry) => entry.id === "static")).toBe(item);
+  expect(flow.getSnapshot().mainFrame.items.find((entry) => entry.id === "dynamic")?.disabled).toBe(
     true,
   );
   flow.destroy();
@@ -90,8 +115,8 @@ test("edits made during an awaited submit remain dirty after success", async () 
   flow.push({
     id: "form",
     type: "form",
-    fields: [{ id: "title", label: "Title" }],
-    submit: { id: "save", title: "Save", run: () => pending },
+    fields: [{ id: "title", type: "text", label: "Title" }],
+    submit: { type: "run", id: "save", title: "Save", run: () => pending },
   });
   flow.setField("title", "before");
   const result = flow.submitForm();
@@ -99,7 +124,7 @@ test("edits made during an awaited submit remain dirty after success", async () 
   flow.setField("title", "after");
   resolve();
   await result;
-  expect(flow.getSnapshot().current.form.dirty).toBe(true);
-  expect(flow.getSnapshot().current.form.values.title).toBe("after");
+  expect(flow.getSnapshot().mainFrame.form.dirty).toBe(true);
+  expect(flow.getSnapshot().mainFrame.form.values.title).toBe("after");
   flow.destroy();
 });

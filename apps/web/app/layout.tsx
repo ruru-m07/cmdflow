@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -12,9 +12,14 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Cmdflow",
+  title: "CmdFlow — Headless Command Workflows",
   description:
-    "A framework-neutral command engine with headless React and Solid adapters. Explore the interactive CmdFlow demo.",
+    "Build command interfaces that search, navigate, branch into actions, load async data, and complete forms with a framework-neutral core.",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#060606",
 };
 
 export default function RootLayout({

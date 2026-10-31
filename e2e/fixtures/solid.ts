@@ -1,9 +1,10 @@
 import {
+  type CmdFlowResolvedItem,
   type CmdFlowSnapshot,
+  type CmdFlowViewDefinition,
   createCmdFlow,
-  type ViewDefinition,
 } from "../../packages/core/dist/index.js";
-import { Command, useCmdflow } from "../../packages/solid/dist/index.js";
+import { Command, createCommandFrame } from "../../packages/solid/dist/index.js";
 import { createComponent, createMemo, render } from "../../packages/solid/test/browser-runtime.js";
 
 interface SolidFixtureApi {
@@ -20,7 +21,7 @@ declare global {
 }
 
 const runs: string[] = [];
-const form: ViewDefinition = {
+const form: CmdFlowViewDefinition = {
   id: "report",
   type: "form",
   title: "Create report",
@@ -28,6 +29,7 @@ const form: ViewDefinition = {
     {
       id: "title",
       label: "Report title",
+      type: "text",
       required: true,
       validate: (value) =>
         String(value).trim().length < 4 ? "Use at least four characters." : undefined,
@@ -45,6 +47,7 @@ const form: ViewDefinition = {
     },
   ],
   submit: {
+    type: "run",
     id: "submit-report",
     title: "Save report",
     run: ({ values }) => {
@@ -53,26 +56,28 @@ const form: ViewDefinition = {
     },
   },
 };
-const store = createCmdFlow<unknown>({
+const flow = createCmdFlow<unknown>({
   id: "solid-browser",
   commands: [
     {
       id: "alpha",
       title: "Alpha",
+      action: {
+        type: "run",
+        id: "open-alpha",
+        title: "Open Alpha",
+        run: () => {
+          runs.push("alpha");
+        },
+      },
       actions: [
         {
-          id: "open-alpha",
-          title: "Open Alpha",
-          priority: "primary",
-          run: () => {
-            runs.push("alpha");
-          },
-        },
-        {
+          type: "submenu",
           id: "more",
           title: "More actions",
-          children: [
+          actions: [
             {
+              type: "run",
               id: "nested",
               title: "Nested action",
               run: () => {
@@ -82,6 +87,7 @@ const store = createCmdFlow<unknown>({
           ],
         },
         {
+          type: "run",
           id: "delete",
           title: "Delete Alpha",
           destructive: true,
@@ -95,27 +101,43 @@ const store = createCmdFlow<unknown>({
       id: "beta",
       title: "Beta",
       disabled: { reason: "Connect your account" },
-      run: () => {
-        runs.push("beta");
+      action: {
+        type: "run",
+        id: "open-beta",
+        title: "Open Beta",
+        run: () => {
+          runs.push("beta");
+        },
       },
     },
     {
       id: "gamma",
       title: "Gamma",
-      run: () => {
-        runs.push("gamma");
+      action: {
+        type: "run",
+        id: "open-gamma",
+        title: "Open Gamma",
+        run: () => {
+          runs.push("gamma");
+        },
       },
     },
     {
       id: "report",
       title: "Create report",
-      run: () => ({ type: "push-view", target: "main", view: form }),
+      action: {
+        type: "view",
+        id: "create-report",
+        title: "Create report",
+        target: "main",
+        view: form,
+      },
     },
   ],
 });
 let subscriptions = 0;
-const subscribe = store.subscribe;
-store.subscribe = (listener) => {
+const subscribe = flow.subscribe;
+flow.subscribe = (listener) => {
   subscriptions += 1;
   const unsubscribe = subscribe(listener);
   return () => {
@@ -150,12 +172,14 @@ function submitButton() {
 function MainList() {
   return [
     createComponent(Command.Input, { "aria-label": "Search Solid commands" }),
-    createComponent(Command.List, { children: (item) => createComponent(Command.Item, { item }) }),
+    createComponent(Command.List, {
+      children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
+    }),
   ];
 }
 function Palette() {
-  const { snapshot } = useCmdflow();
-  const isForm = createMemo(() => snapshot().current.view.type === "form");
+  const frame = createCommandFrame();
+  const isForm = createMemo(() => frame()?.view.type === "form");
   const content = createMemo(() =>
     isForm() ? createComponent(FormView, {}) : createComponent(MainList, {}),
   );
@@ -164,18 +188,18 @@ function Palette() {
     get children() {
       return [
         content(),
-        createComponent(Command.ActionsTrigger, { children: "Actions" }),
+        createComponent(Command.ActionPanelTrigger, { children: "Actions" }),
         createComponent(Command.Close, {
           "aria-label": "Close Solid palette",
           children: "Close Solid palette",
         }),
-        createComponent(Command.Actions, {
+        createComponent(Command.ActionPanel, {
           "aria-label": "Solid contextual actions",
           get children() {
             return [
               createComponent(Command.Input, { "aria-label": "Search Solid actions" }),
               createComponent(Command.List, {
-                children: (item) => createComponent(Command.Item, { item }),
+                children: (item: CmdFlowResolvedItem) => createComponent(Command.Item, { item }),
               }),
               createComponent(Command.Back, {
                 "aria-label": "Back to actions",
@@ -203,8 +227,8 @@ document.body.append(host);
 const unmount = render(
   () =>
     createComponent(Command.Root, {
-      store,
-      options: {
+      flow,
+      domOptions: {
         id: "solid-browser-dom",
         openShortcut: { key: "j", ctrl: true },
         announcementDelay: 0,
@@ -226,13 +250,13 @@ function disposeView() {
   }
 }
 window.cmdflowSolidFixture = {
-  snapshot: store.getSnapshot,
+  snapshot: flow.getSnapshot,
   runs: () => runs,
   subscriptions: () => subscriptions,
   disposeView,
   destroy() {
     disposeView();
-    store.destroy();
+    flow.destroy();
   },
 };
 document.documentElement.dataset.ready = "true";

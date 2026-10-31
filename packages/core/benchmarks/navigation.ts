@@ -8,14 +8,19 @@ for (const count of [1_000, 10_000]) {
     commands: Array.from({ length: count }, (_, index) => ({
       id: String(index).padStart(5, "0"),
       title: `Command ${index}`,
-      run: () => {},
+      action: {
+        type: "run",
+        id: String(index).padStart(5, "0"),
+        title: `Command ${index}`,
+        run: () => {},
+      },
     })),
   });
   const startupMs = performance.now() - created;
   const started = performance.now();
   for (let index = 0; index < iterations; index += 1) store.moveActive("next");
   const navigationMs = performance.now() - started;
-  const active = store.getSnapshot().current.activeId;
+  const active = store.getSnapshot().mainFrame.activeId;
   if (!active) throw new Error("Benchmark fixture has no active command");
   const scrollStarted = performance.now();
   for (let index = 0; index < iterations; index += 1)
