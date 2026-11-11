@@ -262,6 +262,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     }
     if (destroyed || generation !== rankingGeneration) return;
     rankingReady = true;
+    if (!userNavigated) resetActiveItems();
     publish(!userNavigated);
   }
   async function deriveQuery(frame: Frame<T, TData>) {
@@ -309,6 +310,9 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     for (const [key, profile] of deferredProfiles) profiles.set(key, profile);
     deferredProfiles.clear();
   }
+  function resetActiveItems() {
+    for (const frame of [...main, ...actions]) frame.activeId = null;
+  }
   const navigationRuntime = createNavigationRuntime<T, TData>({
     mainFrames: main,
     actionFrames: actions,
@@ -338,7 +342,10 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     const storesWereActive = externalStoresActive;
     opened = value;
     session += 1;
-    if (value) releaseRanking();
+    if (value) {
+      releaseRanking();
+      resetActiveItems();
+    }
     reconcileExternalStores();
     if (value) {
       if (storesWereActive) {
