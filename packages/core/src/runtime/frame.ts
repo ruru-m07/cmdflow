@@ -57,7 +57,6 @@ export function createFrameState<TContext, TData>(
     snapshot,
     candidates: new Map(),
     staticItems: new Map(),
-    navigationRevision: 0,
     formVersion: 0,
     queryKeyGeneration: 0,
     rankExplanations: [],

@@ -140,9 +140,10 @@ browser origin. There is no server synchronization.
 `ranking-feedback` diagnostic event is emitted after a successful feedback commit and subsequent
 hydration. Do not treat action success or `storage.ready` as a durable-write acknowledgment. The
 flow's `rankingReady` snapshot becomes true after its initial profile hydration attempt settles;
-it is not a signal that every query fingerprint or background write has finished. Hydration can
-preserve the currently active candidate even when its displayed position changes. Late updates
-are deferred after keyboard/pointer navigation to avoid moving the user's target.
+it is not a signal that every query fingerprint or background write has finished. Once the user
+navigates the results or opens a child view, late ranking updates do not reorder the current
+search. Returning from the child restores the same query and active result. Changing or clearing
+the query lets CmdFlow apply newly learned ranking and activate the first result in the new order.
 
 ## Current limits
 

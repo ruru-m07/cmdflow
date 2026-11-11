@@ -280,14 +280,23 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
       return;
     }
     frame.queryKey = undefined;
-    const navigation = frame.navigationRevision;
     try {
       const policy = typeof configured === "function" ? await configured(scope(frame)) : configured;
       const key = await deriveRankingQueryKey(query, scope(frame), policy);
-      if (!frameAlive(frame) || generation !== frame.queryKeyGeneration || query !== frame.query)
+      // A later publish (including Escape) would use this key even if we didn't publish here.
+      // Leave the ranking inputs untouched once navigation has locked the current query.
+      if (
+        !key ||
+        !frameAlive(frame) ||
+        generation !== frame.queryKeyGeneration ||
+        query !== frame.query ||
+        frame.composing ||
+        frame.rankingLocked
+      )
         return;
       frame.queryKey = key;
-      if (frame.navigationRevision === navigation) publish();
+      frame.activeId = null;
+      publish();
     } catch (error) {
       diagnostic("query-key-error", frame.id, message(error));
     }
@@ -381,7 +390,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     frame.query = query;
     frame.composing = composing;
     if (!composing) frame.committedQuery = query;
-    if (changed) frame.navigationRevision += 1;
     if (committed) frame.activeId = null;
     if (frame.surface === "main" && actions.length) closeActionStack();
     if (!composing) {
@@ -635,7 +643,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
       if (frame.activeId === candidateId) return;
       frame.activeId = candidateId;
       frame.rankingLocked = true;
-      frame.navigationRevision += 1;
       effect("scroll", { frameId: frame.id });
       publishInteraction(frame);
     },
@@ -657,7 +664,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
           ? [candidateId]
           : [...frame.selectedIds, candidateId];
       frame.rankingLocked = true;
-      frame.navigationRevision += 1;
       publishInteraction(frame);
     },
     openActions(candidateId, address) {
@@ -670,7 +676,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         : (frame.definition.actions ?? []);
       if (!definitions.length) return;
       frame.rankingLocked = true;
-      frame.navigationRevision += 1;
       closeActionStack();
       const next = makeFrame(
         {

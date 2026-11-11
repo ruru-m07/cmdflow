@@ -133,14 +133,11 @@ export function createDomController<TContext = unknown, TData = unknown>(
       const addressKey = ids.addressKey(address);
       const input = elements.inputs.get(addressKey);
       if (input) {
-        const inputProps = props.getInputProps(address, snapshot);
         if (mode === "delegate") {
-          native.applyAttributes(input, inputProps);
+          native.applyAttributes(input, props.getInputProps(address, snapshot));
           if (input.value !== frame.query && !keyboard.composing.has(addressKey))
             input.value = frame.query;
-        } else if (inputProps["aria-activedescendant"])
-          input.setAttribute("aria-activedescendant", inputProps["aria-activedescendant"]);
-        else input.removeAttribute("aria-activedescendant");
+        } else native.syncActiveDescendant(address, snapshot);
       }
       const list = elements.lists.get(addressKey);
       if (list && mode === "delegate")

@@ -47,7 +47,6 @@ export interface Frame<TContext, TData = unknown> {
     }
   >;
   actionOrigin?: { frameId: string; candidateId?: CandidateId };
-  navigationRevision: number;
   formVersion: number;
   validation?: AbortController;
   queryKey?: RankingQueryKey;

@@ -1,4 +1,4 @@
-import type { CandidateId, CmdFlow, CmdFlowSurface } from "@cmdflow/core";
+import type { CandidateId, CmdFlow, CmdFlowSnapshot, CmdFlowSurface } from "@cmdflow/core";
 import type { DomEffects } from "./effects.js";
 import type { ElementRegistry } from "./element-registry.js";
 import { isHtmlElement } from "./focus.js";
@@ -22,6 +22,7 @@ import type {
 
 export interface NativeDomController extends DomElementBindings {
   applyAttributes(element: HTMLElement, props: object): void;
+  syncActiveDescendant(address: Address, snapshot?: CmdFlowSnapshot): void;
 }
 
 interface NativeControllerDependencies<TContext, TData> {
@@ -76,6 +77,15 @@ export function createNativeController<TContext, TData>({
         element.toggleAttribute(name, value === true);
       else element.setAttribute(attribute, String(value));
     }
+  }
+
+  // A renderer can bind the input, list, and active option in separate steps.
+  function syncActiveDescendant(address: Address, snapshot = flow.getSnapshot()): void {
+    const input = elements.inputs.get(ids.addressKey(address, snapshot));
+    if (!input) return;
+    const activeId = props.getInputProps(address, snapshot)["aria-activedescendant"];
+    if (activeId) input.setAttribute("aria-activedescendant", activeId);
+    else input.removeAttribute("aria-activedescendant");
   }
 
   function bindDialog(element: HTMLElement): Cleanup {
@@ -165,6 +175,7 @@ export function createNativeController<TContext, TData>({
     const address = ids.address(value);
     const mapKey = ids.addressKey(address);
     elements.inputs.set(mapKey, element);
+    if (mode === "props") syncActiveDescendant(address);
     const handlers =
       mode === "delegate"
         ? [
@@ -188,6 +199,7 @@ export function createNativeController<TContext, TData>({
     const address = ids.address(value);
     const mapKey = ids.addressKey(address);
     elements.lists.set(mapKey, element);
+    if (mode === "props") syncActiveDescendant(address);
     const unlisten = listen(element, "scroll", () => {
       const frame = ids.frame(address);
       const active = frame?.activeId;
@@ -203,7 +215,9 @@ export function createNativeController<TContext, TData>({
     });
     return cleanup(() => {
       unlisten();
-      if (elements.lists.get(mapKey) === element) elements.lists.delete(mapKey);
+      if (elements.lists.get(mapKey) !== element) return;
+      elements.lists.delete(mapKey);
+      syncActiveDescendant(address);
     });
   }
 
@@ -211,8 +225,10 @@ export function createNativeController<TContext, TData>({
     const address = ids.address(value);
     const mapKey = ids.itemKey(id, address);
     elements.items.set(mapKey, element);
+    if (mode === "props" && ids.frame(address)?.activeId === id) syncActiveDescendant(address);
     return cleanup(() => {
-      if (elements.items.get(mapKey) === element) elements.items.delete(mapKey);
+      if (elements.items.get(mapKey) !== element) return;
+      elements.items.delete(mapKey);
       const input = elements.inputs.get(ids.addressKey(address));
       if (input?.getAttribute("aria-activedescendant") === element.id)
         input.removeAttribute("aria-activedescendant");
@@ -267,6 +283,7 @@ export function createNativeController<TContext, TData>({
 
   return {
     applyAttributes,
+    syncActiveDescendant,
     bindDialog,
     bindInput,
     bindList,
