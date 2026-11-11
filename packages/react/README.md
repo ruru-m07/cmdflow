@@ -11,7 +11,6 @@ bun add @cmdflow/react
 
 ```tsx
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
-import "@cmdflow/react/preset.css";
 
 const commands = [
   {

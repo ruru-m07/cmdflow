@@ -4,7 +4,6 @@ import {
   Command,
   type CmdFlowCommandDefinition,
 } from "@cmdflow/react";
-import "@cmdflow/react/preset.css";
 
 const commands = [
   {
@@ -28,7 +27,7 @@ export function CommandPalette() {
         <Command.List>
           {(item) => <Command.Item key={item.candidateId} item={item} />}
         </Command.List>
-        <Command.Status />
+        <Command.Status className="sr-only" />
       </Command.Dialog>
     </Command.Root>
   );

@@ -139,24 +139,11 @@ interface FieldErrorProps {
   readonly "data-cmdflow-part": "field-error";
 }
 
-export interface VisuallyHiddenStyle {
-  readonly position: "absolute";
-  readonly width: string;
-  readonly height: string;
-  readonly padding: string;
-  readonly margin: string;
-  readonly overflow: string;
-  readonly clipPath: string;
-  readonly whiteSpace: "nowrap";
-  readonly border: string;
-}
-
 interface StatusProps {
   readonly "data-cmdflow-part": "status";
   readonly role: "status";
   readonly "aria-live": "polite";
   readonly "aria-atomic": true;
-  readonly style: VisuallyHiddenStyle;
 }
 
 interface ConfirmationProps {

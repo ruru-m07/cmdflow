@@ -2,20 +2,6 @@ import type { CmdFlowFrameSnapshot } from "@cmdflow/core";
 import type { ElementRegistry } from "./element-registry.js";
 import { focusElement } from "./focus.js";
 import type { DomIds } from "./ids.js";
-import type { VisuallyHiddenStyle } from "./types.js";
-
-/** Required independently of optional reset/preset CSS. */
-export const visuallyHiddenStyle: VisuallyHiddenStyle = {
-  position: "absolute",
-  width: "1px",
-  height: "1px",
-  padding: "0",
-  margin: "-1px",
-  overflow: "hidden",
-  clipPath: "inset(50%)",
-  whiteSpace: "nowrap",
-  border: "0",
-};
 
 export interface DomEffects {
   setModality(modality: "keyboard" | "pointer"): void;

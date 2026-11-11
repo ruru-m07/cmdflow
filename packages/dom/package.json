@@ -1,15 +1,11 @@
 {
   "name": "@cmdflow/dom",
   "version": "0.1.0",
-  "description": "Browser interaction, accessibility, and optional styles for CmdFlow.",
+  "description": "Headless browser interaction and accessibility primitives for CmdFlow.",
   "type": "module",
-  "sideEffects": [
-    "**/*.css"
-  ],
+  "sideEffects": false,
   "files": [
-    "dist",
-    "src/reset.css",
-    "src/preset.css"
+    "dist"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,9 +19,7 @@
       "types": "./dist/persistence.d.ts",
       "import": "./dist/persistence.js",
       "default": "./dist/persistence.js"
-    },
-    "./reset.css": "./src/reset.css",
-    "./preset.css": "./src/preset.css"
+    }
   },
   "scripts": {
     "build": "bun ../../scripts/clean-package-dist.ts && tsc --project tsconfig.json",

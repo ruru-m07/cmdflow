@@ -3,7 +3,6 @@ import type { InputElement } from "./types.js";
 export interface ElementRegistry {
   dialog: HTMLElement | null;
   status: HTMLElement | null;
-  internalStatus: HTMLElement | null;
   confirmation: HTMLElement | null;
   readonly inputs: Map<string, HTMLInputElement>;
   readonly lists: Map<string, HTMLElement>;
@@ -17,7 +16,6 @@ export function createElementRegistry(): ElementRegistry {
   const registry: ElementRegistry = {
     dialog: null,
     status: null,
-    internalStatus: null,
     confirmation: null,
     inputs: new Map(),
     lists: new Map(),
@@ -27,7 +25,6 @@ export function createElementRegistry(): ElementRegistry {
     clear() {
       registry.dialog = null;
       registry.status = null;
-      registry.internalStatus = null;
       registry.confirmation = null;
       registry.inputs.clear();
       registry.lists.clear();

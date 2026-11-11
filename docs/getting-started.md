@@ -22,7 +22,6 @@ or import another CmdFlow package for the basic path.
 "use client";
 
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
-import "@cmdflow/react/preset.css";
 
 const commands = [
   {
@@ -71,15 +70,15 @@ export function AppCommands() {
           {(item) => <Command.Item key={item.candidateId} item={item} />}
         </Command.List>
         <Command.Close>Close</Command.Close>
-        <Command.Status />
+        <Command.Status className="srOnly" />
       </Command.Dialog>
     </Command.Root>
   );
 }
 ```
 
-The managed root creates the flow, registers `commands`, and owns cleanup. Add application styling
-around the parts, or keep the imported preset for a small usable default.
+The managed root creates the flow, registers `commands`, and owns cleanup. CmdFlow provides no
+visual styles; apply your design system through native props, classes, or render functions.
 
 Treat `commands` as initialization input and keep it stable for the root's lifetime. Use
 `defaultOpen` and `defaultQuery` for uncontrolled initial state, or pair `open` with
@@ -98,7 +97,6 @@ The Solid adapter uses the same definitions and part names.
 
 ```tsx
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/solid";
-import "@cmdflow/solid/preset.css";
 
 const commands = [
   {
@@ -124,7 +122,7 @@ export function AppCommands() {
         <Command.Input aria-label="Search commands" placeholder="Search…" />
         <Command.List>{(item) => <Command.Item item={item} />}</Command.List>
         <Command.Close>Close</Command.Close>
-        <Command.Status />
+        <Command.Status class="srOnly" />
       </Command.Dialog>
     </Command.Root>
   );
@@ -145,6 +143,7 @@ still imports only `@cmdflow/dom`.
 <dialog id="command-dialog" data-cmdflow-root aria-label="Application commands">
   <input id="command-input" aria-label="Search commands" placeholder="Search…" />
   <div id="command-list"></div>
+  <span id="command-status" class="srOnly"></span>
 </dialog>
 ```
 
@@ -154,7 +153,6 @@ import {
   createDomController,
   type CmdFlowCommandDefinition,
 } from "@cmdflow/dom";
-import "@cmdflow/dom/preset.css";
 
 const commands = [
   {
@@ -175,14 +173,16 @@ const trigger = document.querySelector<HTMLButtonElement>("#command-trigger");
 const dialog = document.querySelector<HTMLDialogElement>("#command-dialog");
 const input = document.querySelector<HTMLInputElement>("#command-input");
 const list = document.querySelector<HTMLElement>("#command-list");
+const status = document.querySelector<HTMLElement>("#command-status");
 
-if (!trigger || !dialog || !input || !list) {
+if (!trigger || !dialog || !input || !list || !status) {
   throw new Error("CmdFlow example markup is incomplete.");
 }
 
 const flow = createCmdFlow({ commands });
 const controller = createDomController(flow, { eventMode: "delegate" });
 const releaseDialog = controller.bindDialog(dialog);
+const releaseStatus = controller.bindStatus(status);
 let releaseFrame = () => {};
 let releaseItems: Array<() => void> = [];
 let boundFrameId: string | undefined;
@@ -227,6 +227,7 @@ export function destroyCommands() {
   unsubscribe();
   for (const release of releaseItems) release();
   releaseFrame();
+  releaseStatus();
   releaseDialog();
   controller.destroy();
   flow.destroy();
@@ -254,14 +255,10 @@ export function AppCommands() {
 The host owns an injected flow and eventually calls `flow.destroy()`. The adapter only owns its DOM
 controller and subscriptions.
 
-## Choose a styling path
+## Apply application styling
 
-- Keep `preset.css` for a small starter appearance.
-- Replace it with `reset.css` when the application wants complete visual ownership with normalized
-  controls.
-- Import neither stylesheet for a fully headless integration.
-
-See [styling](styling.md) for tokens and state selectors.
+CmdFlow ships no CSS. Apply your design system through classes, native props, or render functions.
+See [styling](styling.md) for the state attributes and accessibility requirements.
 
 ## Next steps
 

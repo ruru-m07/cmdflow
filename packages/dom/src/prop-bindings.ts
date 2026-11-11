@@ -6,7 +6,6 @@ import type {
   CmdFlowSnapshot,
 } from "@cmdflow/core";
 import type { DomEffects } from "./effects.js";
-import { visuallyHiddenStyle } from "./effects.js";
 import type { ElementRegistry } from "./element-registry.js";
 import { eventTarget, isHtmlElement } from "./focus.js";
 import type { DomIds } from "./ids.js";
@@ -296,7 +295,6 @@ export function createPropBindings<TContext, TData>({
       role: "status" as const,
       "aria-live": "polite" as const,
       "aria-atomic": true as const,
-      style: visuallyHiddenStyle,
     };
   }
 

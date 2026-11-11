@@ -209,4 +209,4 @@ The dependency direction remains:
 Core never owns DOM nodes or framework components. Adapters never redefine search, navigation,
 execution, or ranking policy.
 
-Next, choose the [headless, reset, or preset styling path](styling.md).
+Next, apply the application's design system using the [headless styling contract](styling.md).

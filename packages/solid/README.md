@@ -12,7 +12,6 @@ bun add @cmdflow/solid
 
 ```tsx
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/solid";
-import "@cmdflow/solid/preset.css";
 
 const commands = [
   {

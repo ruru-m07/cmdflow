@@ -1,7 +1,7 @@
 # @cmdflow/dom
 
-Browser behavior for CmdFlow: keyboard and pointer routing, modal state, focus restoration, IME,
-ARIA relationships, scroll coordination, and optional scoped CSS.
+Headless browser behavior for CmdFlow: keyboard and pointer routing, modal state, focus restoration,
+IME, ARIA relationships, and scroll coordination.
 
 > **v0.2 repository API:** This API is implemented in this repository but has not been published
 > yet. The currently published v0.1 package uses the earlier API.
@@ -15,7 +15,6 @@ consumer import:
 
 ```ts
 import { createCmdFlow, createDomController } from "@cmdflow/dom";
-import "@cmdflow/dom/preset.css";
 
 const flow = createCmdFlow({
   commands: [
@@ -42,11 +41,5 @@ The controller does not render markup or subscribe to the flow. Render a snapsho
 corresponding elements, then call `controller.sync(snapshot)` after those elements commit. Explicit
 surface addresses keep stale frames from receiving events.
 
-Styling choices:
-
-```ts
-import "@cmdflow/dom/reset.css";  // scoped low-specificity reset
-import "@cmdflow/dom/preset.css"; // reset plus starter appearance
-```
-
-See [getting started](../../docs/getting-started.md) and [styling](../../docs/styling.md).
+The package ships no CSS. The application owns all markup and styling. See
+[getting started](../../docs/getting-started.md) and [styling](../../docs/styling.md).

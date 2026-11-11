@@ -1,5 +1,5 @@
 import type { CmdFlow, CmdFlowSnapshot } from "@cmdflow/core";
-import { createDomEffects, visuallyHiddenStyle } from "./effects.js";
+import { createDomEffects } from "./effects.js";
 import { createElementRegistry } from "./element-registry.js";
 import { focusElement, getDeepActiveElement } from "./focus.js";
 import { createDomIds } from "./ids.js";
@@ -17,9 +17,8 @@ export type {
   DomPropBindings,
   EventMode,
   InputElement,
-  VisuallyHiddenStyle,
 } from "./types.js";
-export { describeKeybinding, matchesKeybinding, visuallyHiddenStyle };
+export { describeKeybinding, matchesKeybinding };
 
 /** Lifecycle binding never assumes a flow notification means a framework has committed. */
 export function createDomController<TContext = unknown, TData = unknown>(

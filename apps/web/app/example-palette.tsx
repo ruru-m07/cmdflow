@@ -456,7 +456,7 @@ export function ExamplePalette({ demo }: ExamplePaletteProps) {
 
       <ActionSurface />
       <ConfirmationSurface />
-      <Command.Status />
+      <Command.Status className="sr-only" />
     </Command.Dialog>
   );
 }

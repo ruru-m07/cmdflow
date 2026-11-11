@@ -1,6 +1,5 @@
 import type {
   CmdFlowActionDefinition as ActionDefinition,
-  CmdFlowActionEvaluation as ActionEvaluation,
   CmdFlowActionOutcome as ActionOutcome,
   CmdFlowCommandDefinition as CommandDefinition,
   CmdFlowExtensionDefinition as ExtensionDefinition,
@@ -18,19 +17,11 @@ import type {
   CmdFlowSurface as Surface,
   CmdFlowSurfaceAddress as SurfaceAddress,
 } from "../contracts/primitives.js";
-import type {
-  CmdFlowActionSnapshot as ActionSnapshot,
-  CmdFlowSnapshot,
-  CmdFlowResolvedItem as ResolvedItem,
-} from "../contracts/snapshots.js";
-import { createCandidateId, createRankingSurfaceId, immutable } from "../identity.js";
-import {
-  createMemoryRankingStore,
-  deriveRankingQueryKey,
-  normalizeQueryV1,
-  rankItems,
-} from "../ranking.js";
+import type { CmdFlowSnapshot } from "../contracts/snapshots.js";
+import { createRankingSurfaceId, immutable } from "../identity.js";
+import { createMemoryRankingStore, deriveRankingQueryKey, normalizeQueryV1 } from "../ranking.js";
 import type { RankingProfile, RankingScope } from "../ranking-types.js";
+import { ActionResolver } from "./action-resolver.js";
 import {
   commandFromAction,
   normalizeCommandDefinition,
@@ -40,17 +31,13 @@ import {
 } from "./definitions.js";
 import { createExecutionRuntime, type ExecutionFeedback } from "./execution-runtime.js";
 import { createFormRuntime } from "./form-runtime.js";
-import { createFrameState, createViewSnapshot } from "./frame.js";
+import { createFrameState } from "./frame.js";
+import { FrameProjector } from "./frame-projector.js";
 import { createNavigationRuntime } from "./navigation-runtime.js";
 import { createRuntimeSnapshot } from "./snapshot.js";
 import { createSourceRuntime } from "./source-runtime.js";
 import type { Frame, RunningExecution } from "./state.js";
-import {
-  evaluateAvailability as available,
-  isContextStore,
-  errorMessage as message,
-  terminalResult as terminal,
-} from "./utils.js";
+import { isContextStore, errorMessage as message, terminalResult as terminal } from "./utils.js";
 
 export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>(
   options: CmdFlowOptions<T, TData> = {},
@@ -184,273 +171,25 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
   function makeFrame(definition: ViewDefinition<T, TData>, surface: Surface): Frame<T, TData> {
     return createFrameState(`${id}:frame:${++serial}`, definition, surface);
   }
-  function evaluation(
-    frame: Frame<T, TData>,
-    candidateId?: CandidateId,
-  ): ActionEvaluation<T, TData> {
-    const origin = frame.actionOrigin;
-    const actual = origin ? (main.find((entry) => entry.id === origin.frameId) ?? frame) : frame;
-    const active = origin?.candidateId ?? candidateId;
-    return {
-      appContext: context,
-      frame: actual.snapshot,
-      surface: frame.surface,
-      item: active
-        ? (actual.snapshot.items.find((item) => item.candidateId === active) ?? null)
-        : null,
-      selection: actual.snapshot.selectedIds,
-    };
-  }
-  function actionSnapshot(
-    action: ActionDefinition<T, TData>,
-    input: ActionEvaluation<T, TData>,
-  ): ActionSnapshot | null {
-    try {
-      if (action.visible && !action.visible(input)) return null;
-      return immutable({
-        id: action.id,
-        title: action.title,
-        subtitle: action.subtitle,
-        shortcut: action.shortcut,
-        section: action.section,
-        destructive: action.destructive ?? false,
-        ...available(action.enabled?.(input)),
-        priority: action.priority ?? "auxiliary",
-        hasChildren: action.type === "submenu" && action.actions.length > 0,
-      });
-    } catch (error) {
-      diagnostic("predicate-error", action.id, message(error));
-      return null;
-    }
-  }
-  function actionDefinitions(
-    command: CommandDefinition<T, TData>,
-  ): readonly ActionDefinition<T, TData>[] {
-    return command.actions ?? (command.action ? [command.action] : []);
-  }
-  function actionSnapshots(
-    definitions: readonly ActionDefinition<T, TData>[],
-    input: ActionEvaluation<T, TData>,
-  ): readonly ActionSnapshot[] {
-    const result = definitions
-      .map((action) => actionSnapshot(action, input))
-      .filter((item): item is ActionSnapshot => !!item);
-    const priorities = new Set<string>();
-    let normalized = result.map((item) => {
-      if (item.priority === "auxiliary") return item;
-      if (priorities.has(item.priority)) {
-        diagnostic("duplicate-priority", item.id);
-        return { ...item, priority: "auxiliary" as const };
-      }
-      priorities.add(item.priority);
-      return item;
-    });
-    if (!priorities.has("primary")) {
-      const first = normalized.find((item) => !item.disabled && !item.destructive);
-      normalized = normalized.map((item) =>
-        item === first ? { ...item, priority: "primary" as const } : item,
-      );
-    }
-    return immutable(normalized);
-  }
-  function buildFrame(frame: Frame<T, TData>) {
-    const candidates = new Map<CandidateId, CommandDefinition<T, TData>>();
-    const resolved: ResolvedItem<TData>[] = [];
-    const collect = (
-      sourceId: string,
-      definitions: Iterable<CommandDefinition<T, TData>>,
-      sourcePriority = 0,
-    ) => {
-      for (const command of definitions) {
-        const candidateId = createCandidateId(sourceId, command.id);
-        const cached = frame.staticItems.get(candidateId);
-        if (cached?.command === command && cached.sourcePriority === sourcePriority) {
-          candidates.set(candidateId, command);
-          resolved.push(cached.item);
-          continue;
-        }
-        const preliminary = immutable({
-          candidateId,
-          id: command.id,
-          sourceId,
-          title: command.title,
-          subtitle: command.subtitle,
-          keywords: command.keywords,
-          aliases: command.aliases,
-          section: command.section,
-          data: command.data,
-          providerRank: command.providerRank,
-          favorite: command.favorite,
-          contextTier: command.contextTier,
-          allowFallback: command.allowFallback,
-          personalize: command.personalize,
-          sourcePriority,
-          disabled: false,
-          actions: [],
-        });
-        const input = frame.actionOrigin
-          ? evaluation(frame, candidateId)
-          : { ...evaluation(frame), item: preliminary };
-        try {
-          if (command.visible && !command.visible(input)) continue;
-          const disabled =
-            command.disabled === true
-              ? { disabled: true }
-              : typeof command.disabled === "object"
-                ? { disabled: true, disabledReason: command.disabled.reason }
-                : available(command.enabled?.(input));
-          const item = immutable({
-            candidateId,
-            id: command.id,
-            sourceId,
-            title: command.title,
-            subtitle: command.subtitle,
-            keywords: command.keywords,
-            aliases: command.aliases,
-            section: command.section,
-            data: command.data,
-            providerRank: command.providerRank,
-            favorite: command.favorite,
-            contextTier: command.contextTier,
-            allowFallback: command.allowFallback,
-            personalize: command.personalize,
-            sourcePriority,
-            ...disabled,
-            actions: actionSnapshots(actionDefinitions(command), input),
-          });
-          candidates.set(candidateId, command);
-          resolved.push(item);
-          if (
-            !command.visible &&
-            !command.enabled &&
-            !actionDefinitions(command).some((action) => action.visible || action.enabled)
-          ) {
-            frame.staticItems.set(candidateId, { command, sourcePriority, item });
-          } else frame.staticItems.delete(candidateId);
-        } catch (error) {
-          diagnostic("command-error", command.id, message(error));
-        }
-      }
-    };
-    if (frame === main[0]) collect("registry", commands.values());
-    collect(`view:${frame.definition.id}`, frame.definition.items ?? []);
-    for (const [sourceId, state] of frame.sources)
-      collect(sourceId, state.items.values(), state.definition.sourcePriority ?? 0);
-    for (const candidateId of frame.staticItems.keys())
-      if (!candidates.has(candidateId)) frame.staticItems.delete(candidateId);
-    const frameScope = scope(frame);
-    const ranked = rankItems(resolved, {
-      query: frame.query,
-      scope: frameScope,
-      profile: profiles.get(JSON.stringify(frameScope)),
-      now: clock.now(),
-      queryKey: frame.queryKey,
-    });
-    frame.rankExplanations = ranked.explanations;
-    const items = ranked.items;
-    frame.candidates = candidates;
-    const previousIndex = frame.snapshot.items.findIndex(
-      (entry) => entry.candidateId === frame.activeId,
-    );
-    if (!items.some((entry) => entry.candidateId === frame.activeId))
-      frame.activeId =
-        items[Math.max(0, Math.min(previousIndex, items.length - 1))]?.candidateId ?? null;
-    frame.selectedIds = frame.selectedIds.filter((entry) =>
-      items.some((item) => item.candidateId === entry),
-    );
-    const active = frame.activeId ? candidates.get(frame.activeId) : undefined;
-    const definitions = active ? actionDefinitions(active) : (frame.definition.actions ?? []);
-    frame.snapshot = immutable({
-      id: frame.id,
-      surface: frame.surface,
-      view: createViewSnapshot(frame.definition),
-      query: frame.query,
-      composing: frame.composing,
-      activeId: frame.activeId,
-      selectedIds: frame.selectedIds,
-      items,
-      sources: [...frame.sources.values()].map((state) => state.snapshot),
-      actions: [],
-      scrollAnchor: frame.scrollAnchor,
-      form: frame.form,
-    });
-    frame.snapshot = immutable({
-      ...frame.snapshot,
-      actions: actionSnapshots(definitions, evaluation(frame, frame.activeId ?? undefined)),
-    });
-  }
-  function sameActionSnapshots(left: readonly ActionSnapshot[], right: readonly ActionSnapshot[]) {
-    return (
-      left.length === right.length &&
-      left.every((action, index) => {
-        const other = right[index];
-        if (!other) return false;
-        return (
-          action.id === other.id &&
-          action.title === other.title &&
-          action.subtitle === other.subtitle &&
-          action.section === other.section &&
-          action.destructive === other.destructive &&
-          action.disabled === other.disabled &&
-          action.disabledReason === other.disabledReason &&
-          action.priority === other.priority &&
-          action.hasChildren === other.hasChildren &&
-          action.shortcut?.key === other.shortcut?.key &&
-          action.shortcut?.mod === other.shortcut?.mod &&
-          action.shortcut?.ctrl === other.shortcut?.ctrl &&
-          action.shortcut?.meta === other.shortcut?.meta &&
-          action.shortcut?.alt === other.shortcut?.alt &&
-          action.shortcut?.shift === other.shortcut?.shift
-        );
-      })
-    );
-  }
-  /** Interaction commits retain search order and payload identity while reevaluating actions. */
-  function refreshInteraction(frame: Frame<T, TData>) {
-    const previous = frame.snapshot;
-    const sameSelection =
-      previous.selectedIds.length === frame.selectedIds.length &&
-      previous.selectedIds.every((id, index) => id === frame.selectedIds[index]);
-    frame.snapshot = Object.freeze({
-      ...previous,
-      activeId: frame.activeId,
-      selectedIds: sameSelection ? previous.selectedIds : Object.freeze([...frame.selectedIds]),
-    });
-    const origin = frame.actionOrigin;
-    const actual = origin ? (main.find((entry) => entry.id === origin.frameId) ?? frame) : frame;
-    const lookup = new Map(actual.snapshot.items.map((item) => [item.candidateId, item]));
-    const evaluate = (candidateId?: CandidateId): ActionEvaluation<T, TData> => ({
-      appContext: context,
-      frame: actual.snapshot,
-      surface: frame.surface,
-      item: lookup.get(origin?.candidateId ?? (candidateId as CandidateId)) ?? null,
-      selection: actual.snapshot.selectedIds,
-    });
-    let changedItems = false;
-    const items = previous.items.map((item) => {
-      const command = frame.candidates.get(item.candidateId);
-      if (!command) return item;
-      const definitions = actionDefinitions(command);
-      if (!definitions.some((action) => action.visible || action.enabled)) return item;
-      const nextActions = actionSnapshots(definitions, evaluate(item.candidateId));
-      if (sameActionSnapshots(item.actions, nextActions)) return item;
-      changedItems = true;
-      return Object.freeze({ ...item, actions: nextActions });
-    });
-    const active = frame.activeId ? frame.candidates.get(frame.activeId) : undefined;
-    const nextActions = active
-      ? (items.find((item) => item.candidateId === frame.activeId)?.actions ?? [])
-      : actionSnapshots(frame.definition.actions ?? [], evaluate());
-    frame.snapshot = Object.freeze({
-      ...frame.snapshot,
-      items: changedItems ? Object.freeze(items) : previous.items,
-      actions: sameActionSnapshots(previous.actions, nextActions) ? previous.actions : nextActions,
-    });
-  }
+  const actionResolver = new ActionResolver<T, TData>({
+    getContext: () => context,
+    getMainFrames: () => main,
+    diagnostic,
+  });
+  const frameProjector = new FrameProjector<T, TData>({
+    actions: actionResolver,
+    commands: () => commands.values(),
+    scope,
+    profile: (frameScope) => profiles.get(JSON.stringify(frameScope)),
+    now: () => clock.now(),
+    diagnostic,
+  });
+  const buildFrame = (frame: Frame<T, TData>) => frameProjector.project(frame, frame === main[0]);
   function publishInteraction(frame: Frame<T, TData>) {
-    refreshInteraction(frame);
+    actionResolver.refreshInteraction(frame);
     for (const actionFrame of actions)
-      if (actionFrame.actionOrigin?.frameId === frame.id) refreshInteraction(actionFrame);
+      if (actionFrame.actionOrigin?.frameId === frame.id)
+        actionResolver.refreshInteraction(actionFrame);
     publish(false);
   }
   function publish(rebuild = true) {
@@ -657,13 +396,18 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     if (command?.action && !actionId) {
       return command.action;
     }
-    const definitions = command ? actionDefinitions(command) : (frame.definition.actions ?? []);
+    const definitions = command
+      ? actionResolver.definitions(command)
+      : (frame.definition.actions ?? []);
     if (actionId)
       return (
         definitions.find((action) => action.id === actionId) ??
         (frame.definition.submit?.id === actionId ? frame.definition.submit : undefined)
       );
-    const snapshots = actionSnapshots(definitions, evaluation(frame, candidateId));
+    const snapshots = actionResolver.snapshots(
+      definitions,
+      actionResolver.evaluate(frame, candidateId),
+    );
     const primary = snapshots.find((action) => action.priority === "primary");
     return definitions.find((action) => action.id === primary?.id);
   }
@@ -727,8 +471,8 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     isFrameAlive: frameAlive,
     getMainFrames: () => main,
     getActionFrames: () => actions,
-    evaluate: evaluation,
-    snapshotAction: actionSnapshot,
+    evaluate: (frame, candidateId) => actionResolver.evaluate(frame, candidateId),
+    snapshotAction: (action, input) => actionResolver.snapshot(action, input),
     applyOutcome,
     publish,
     diagnostic,
@@ -745,7 +489,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     isFrameAlive: frameAlive,
     getSession: () => session,
     createValidationId: () => `${id}:validation:${++serial}`,
-    evaluate: evaluation,
+    evaluate: (frame) => actionResolver.evaluate(frame),
     executeSubmit: (frame, action, submittedVersion) =>
       executionRuntime.execute(frame, undefined, action, { submittedVersion }),
     publish,
@@ -909,7 +653,9 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
       if (!frame || destroyed || !opened) return;
       const chosen = candidateId ?? frame.activeId ?? undefined;
       const command = chosen ? frame.candidates.get(chosen) : undefined;
-      const definitions = command ? actionDefinitions(command) : (frame.definition.actions ?? []);
+      const definitions = command
+        ? actionResolver.definitions(command)
+        : (frame.definition.actions ?? []);
       if (!definitions.length) return;
       userNavigated = true;
       frame.navigationRevision += 1;

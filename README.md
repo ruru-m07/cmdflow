@@ -15,7 +15,6 @@ bun add @cmdflow/react
 
 ```tsx
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
-import "@cmdflow/react/preset.css";
 
 const commands = [
   {
@@ -58,7 +57,7 @@ need external registration, async sources, persistence, or shared lifetime.
 - Keyboard, focus, modal, IME, and ARIA behavior through the DOM adapter
 
 Your application owns markup composition, visual design, authorization, data fetching, and action
-side effects. The preset is optional; remove it for a completely headless starting point.
+side effects. CmdFlow ships no CSS and injects no visual styles.
 
 ## Packages
 
@@ -81,8 +80,9 @@ confirmation, and local ranking.
 ## Learn the model
 
 - [Concepts](docs/concepts.md) — commands, actions, views, sources, and flow ownership
+- [Architecture](docs/architecture.md) — package boundaries and internal design rules
 - [Getting started](docs/getting-started.md) — React, Solid, and vanilla DOM
-- [Styling](docs/styling.md) — headless, scoped reset, and starter preset paths
+- [Styling](docs/styling.md) — consumer-owned styling and stable state attributes
 - [Persistence](docs/persistence.md) — opt-in learned-ranking storage and privacy
 - [v0.2 API contract](docs/api-v0.2.md) — the implementation source of truth
 

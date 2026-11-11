@@ -35,12 +35,9 @@ import {
 The React, Solid, and DOM packages re-export the core factory and public `CmdFlow*` contracts they
 need. `@cmdflow/core` remains the direct entrypoint for framework and renderer authors.
 
-Adapter packages also expose their own stylesheet paths:
-
-```ts
-import "@cmdflow/react/preset.css";
-// or "@cmdflow/react/reset.css"
-```
+Adapter packages contain no CSS. They expose behavior, accessibility wiring, state attributes, and
+native prop forwarding so applications can construct the complete interface with their own design
+system.
 
 Optional ranking persistence follows the same one-package path:
 
@@ -66,7 +63,6 @@ Use `commands` when one adapter root should own the flow.
 
 ```tsx
 import { Command, type CmdFlowCommandDefinition } from "@cmdflow/react";
-import "@cmdflow/react/preset.css";
 
 const commands = [
   {
@@ -93,7 +89,7 @@ export function AppCommands() {
           {(item) => <Command.Item key={item.candidateId} item={item} />}
         </Command.List>
         <Command.Close>Close</Command.Close>
-        <Command.Status />
+        <Command.Status className="srOnly" />
       </Command.Dialog>
     </Command.Root>
   );
@@ -218,7 +214,7 @@ export function AppCommands() {
         <Command.List>
           {(item) => <Command.Item key={item.candidateId} item={item} />}
         </Command.List>
-        <Command.Status />
+        <Command.Status className="srOnly" />
       </Command.Dialog>
     </Command.Root>
   );
@@ -392,12 +388,8 @@ implicit prop forwarding.
 
 ## Styling contract
 
-No stylesheet is required for behavior. Each adapter exposes:
-
-- `reset.css` for scoped normalization; and
-- `preset.css` for a small starter appearance that includes the reset.
-
-See [styling](styling.md) for imports, tokens, and state selectors.
+CmdFlow ships and injects no CSS. Every part forwards native presentation props and exposes stable
+state attributes. See [styling](styling.md) for the consumer-owned styling contract.
 
 ## v0.1 to v0.2 direction
 
@@ -411,7 +403,7 @@ See [styling](styling.md) for imports, tokens, and state selectors.
 | `ViewDefinition` | `CmdFlowViewDefinition` with explicit view variants |
 | `ResultSource`-style aliases | `CmdFlowResultSource` |
 | `snapshot.current` | `mainFrame`, `actionFrame`, and `activeFrame` |
-| CSS imported through `@cmdflow/dom` everywhere | CSS subpaths exposed by each adapter |
+| CSS imported through `@cmdflow/dom` | No library CSS; applications own the complete visual layer |
 
 These changes are present on this repository branch but are not available to registry consumers
 until the v0.2 packages are published.

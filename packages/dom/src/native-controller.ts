@@ -1,6 +1,5 @@
 import type { CandidateId, CmdFlow, CmdFlowSurface } from "@cmdflow/core";
 import type { DomEffects } from "./effects.js";
-import { visuallyHiddenStyle } from "./effects.js";
 import type { ElementRegistry } from "./element-registry.js";
 import { isHtmlElement } from "./focus.js";
 import type { DomIds } from "./ids.js";
@@ -85,13 +84,6 @@ export function createNativeController<TContext, TData>({
       throw new Error("A CmdFlow controller can bind only one dialog");
     elements.dialog = element;
     const removals: Cleanup[] = [];
-    if (!elements.status) {
-      elements.internalStatus = element.ownerDocument.createElement("span");
-      elements.status = elements.internalStatus;
-      applyAttributes(elements.status, props.getStatusProps());
-      Object.assign(elements.status.style, visuallyHiddenStyle);
-      element.append(elements.status);
-    }
     removals.push(
       listen(element, "cancel", (event) => {
         event.preventDefault();
@@ -163,11 +155,6 @@ export function createNativeController<TContext, TData>({
     return cleanup(() => {
       for (const remove of removals) remove();
       modal.releaseDialog(element);
-      if (elements.internalStatus) {
-        elements.internalStatus.remove();
-        if (elements.status === elements.internalStatus) elements.status = null;
-        elements.internalStatus = null;
-      }
       effects.cancelAnnouncements();
       if (elements.dialog === element) elements.dialog = null;
       restoreAfterDialogUnbind();
@@ -261,13 +248,8 @@ export function createNativeController<TContext, TData>({
   }
 
   function bindStatus(element: HTMLElement): Cleanup {
-    if (elements.internalStatus) {
-      elements.internalStatus.remove();
-      elements.internalStatus = null;
-    }
     elements.status = element;
     applyAttributes(element, props.getStatusProps());
-    Object.assign(element.style, visuallyHiddenStyle);
     return cleanup(() => {
       if (elements.status === element) elements.status = null;
     });
