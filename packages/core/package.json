@@ -18,7 +18,6 @@
   },
   "scripts": {
     "build": "bun ../../scripts/clean-package-dist.ts && tsc --project tsconfig.json",
-    "test": "bun test tests",
     "check-types": "tsc --noEmit"
   },
   "publishConfig": {

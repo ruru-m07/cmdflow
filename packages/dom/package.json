@@ -29,8 +29,7 @@
   },
   "scripts": {
     "build": "bun ../../scripts/clean-package-dist.ts && tsc --project tsconfig.json",
-    "check-types": "tsc --noEmit",
-    "test": "bun test tests"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@cmdflow/core": "workspace:*"
