@@ -1,6 +1,6 @@
 {
   "name": "@cmdflow/dom",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless browser interaction and accessibility primitives for CmdFlow.",
   "type": "module",
   "sideEffects": false,
