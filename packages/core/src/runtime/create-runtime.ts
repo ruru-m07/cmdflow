@@ -366,11 +366,14 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
   }
   function queryState(query: string, frame: Frame<T, TData>, composing: boolean) {
     if (destroyed || (frame.query === query && frame.composing === composing)) return;
+    const wasComposing = frame.composing;
     const changed = frame.query !== query;
+    const committed = !composing && (changed || wasComposing);
     frame.query = query;
     frame.composing = composing;
     if (!composing) frame.committedQuery = query;
     if (changed) frame.navigationRevision += 1;
+    if (committed) frame.activeId = null;
     if (frame.surface === "main" && actions.length) closeActionStack();
     if (!composing) {
       releaseRanking();
