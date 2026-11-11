@@ -17,7 +17,6 @@ export interface NavigationRuntimeDependencies<TContext, TData> {
     work: () => void,
     affected?: readonly Frame<TContext, TData>[],
   ) => boolean;
-  readonly releaseRanking: () => void;
   readonly deriveQuery: (frame: Frame<TContext, TData>) => void;
   readonly hydrateRanking: () => void;
   readonly startSources: (frame: Frame<TContext, TData>, clear?: boolean) => void;
@@ -81,11 +80,14 @@ export function createNavigationRuntime<TContext, TData>(
     if (replace && stack.length) {
       dependencies.disposeFrame(stack.pop() as Frame<TContext, TData>);
     }
+    if (!replace) {
+      const parent = stack.at(-1);
+      if (parent) parent.rankingLocked = true;
+    }
     if (surface === "main") closeActionStack();
     const frame = dependencies.createFrame(definition, surface);
     if (surface === "actions") frame.actionOrigin = origin;
     stack.push(frame);
-    dependencies.releaseRanking();
     dependencies.deriveQuery(frame);
     dependencies.hydrateRanking();
     dependencies.startSources(frame);

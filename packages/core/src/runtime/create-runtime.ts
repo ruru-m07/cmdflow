@@ -20,7 +20,7 @@ import type {
 import type { CmdFlowSnapshot } from "../contracts/snapshots.js";
 import { createRankingSurfaceId, immutable } from "../identity.js";
 import { createMemoryRankingStore, deriveRankingQueryKey, normalizeQueryV1 } from "../ranking.js";
-import type { RankingProfile, RankingScope } from "../ranking-types.js";
+import type { RankingScope } from "../ranking-types.js";
 import { ActionResolver } from "./action-resolver.js";
 import {
   commandFromAction,
@@ -75,12 +75,9 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
   let effects: DomEffect[] = [];
   let snapshot!: CmdFlowSnapshot<TData>;
   let serverSnapshot: CmdFlowSnapshot<TData>;
-  const profiles = new Map<string, RankingProfile>();
-  const deferredProfiles = new Map<string, RankingProfile>();
   let rankingReady = false;
   let rankingGeneration = 0;
   let rankingWriteGeneration = 0;
-  let userNavigated = false;
   let externalStoresActive = false;
   let unsubscribeContext: (() => void) | undefined;
   let unsubscribeRanking: (() => void) | undefined;
@@ -180,7 +177,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     actions: actionResolver,
     commands: () => commands.values(),
     scope,
-    profile: (frameScope) => profiles.get(JSON.stringify(frameScope)),
     now: () => clock.now(),
     diagnostic,
   });
@@ -248,22 +244,25 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
       const loaded = await Promise.all(
         [...main, ...actions].map(async (frame) => {
           const frameScope = scope(frame);
-          return [
-            JSON.stringify(frameScope),
-            await rankingStore.load({ scope: frameScope, now: clock.now() }),
-          ] as const;
+          return [frame, await rankingStore.load({ scope: frameScope, now: clock.now() })] as const;
         }),
       );
       if (destroyed || generation !== rankingGeneration) return;
-      for (const [key, profile] of loaded)
-        (userNavigated ? deferredProfiles : profiles).set(key, profile);
+      for (const [frame, profile] of loaded) {
+        if (frame.rankingLocked) {
+          frame.deferredRankingProfile = profile;
+        } else {
+          frame.rankingProfile = profile;
+          frame.deferredRankingProfile = undefined;
+          frame.activeId = null;
+        }
+      }
     } catch (error) {
       diagnostic("ranking-storage-error", undefined, message(error));
     }
     if (destroyed || generation !== rankingGeneration) return;
     rankingReady = true;
-    if (!userNavigated) resetActiveItems();
-    publish(!userNavigated);
+    publish();
   }
   async function deriveQuery(frame: Frame<T, TData>) {
     const generation = ++frame.queryKeyGeneration;
@@ -305,10 +304,14 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     });
     return true;
   }
-  function releaseRanking() {
-    userNavigated = false;
-    for (const [key, profile] of deferredProfiles) profiles.set(key, profile);
-    deferredProfiles.clear();
+  function releaseRanking(frames: readonly Frame<T, TData>[] = [...main, ...actions]) {
+    for (const frame of frames) {
+      frame.rankingLocked = false;
+      if (frame.deferredRankingProfile) {
+        frame.rankingProfile = frame.deferredRankingProfile;
+        frame.deferredRankingProfile = undefined;
+      }
+    }
   }
   function resetActiveItems() {
     for (const frame of [...main, ...actions]) frame.activeId = null;
@@ -320,7 +323,6 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     createFrame: makeFrame,
     disposeFrame,
     requestDiscard,
-    releaseRanking,
     deriveQuery: (frame) => {
       void deriveQuery(frame);
     },
@@ -383,7 +385,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     if (committed) frame.activeId = null;
     if (frame.surface === "main" && actions.length) closeActionStack();
     if (!composing) {
-      releaseRanking();
+      releaseRanking([frame]);
       void deriveQuery(frame);
       startSources(frame);
     } else for (const state of frame.sources.values()) abortSource(state);
@@ -487,8 +489,8 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     publish,
     diagnostic,
     effect,
-    onExecutionStart: () => {
-      userNavigated = true;
+    onExecutionStart: (origin) => {
+      origin.rankingLocked = true;
     },
     recordSuccessfulUse,
   });
@@ -632,7 +634,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         return;
       if (frame.activeId === candidateId) return;
       frame.activeId = candidateId;
-      userNavigated = true;
+      frame.rankingLocked = true;
       frame.navigationRevision += 1;
       effect("scroll", { frameId: frame.id });
       publishInteraction(frame);
@@ -654,7 +656,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         : frame.definition.selectionMode === "single"
           ? [candidateId]
           : [...frame.selectedIds, candidateId];
-      userNavigated = true;
+      frame.rankingLocked = true;
       frame.navigationRevision += 1;
       publishInteraction(frame);
     },
@@ -667,7 +669,7 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         ? actionResolver.definitions(command)
         : (frame.definition.actions ?? []);
       if (!definitions.length) return;
-      userNavigated = true;
+      frame.rankingLocked = true;
       frame.navigationRevision += 1;
       closeActionStack();
       const next = makeFrame(

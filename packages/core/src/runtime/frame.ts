@@ -61,5 +61,6 @@ export function createFrameState<TContext, TData>(
     formVersion: 0,
     queryKeyGeneration: 0,
     rankExplanations: [],
+    rankingLocked: false,
   };
 }

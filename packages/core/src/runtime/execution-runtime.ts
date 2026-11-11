@@ -62,7 +62,7 @@ export interface ExecutionRuntimeDependencies<TContext, TData> {
     type: CmdFlowDomEffect["type"],
     extras?: Omit<CmdFlowDomEffect, "id" | "revision" | "type">,
   ) => void;
-  readonly onExecutionStart: () => void;
+  readonly onExecutionStart: (origin: Frame<TContext, TData>) => void;
   readonly recordSuccessfulUse: (feedback: ExecutionFeedback<TContext, TData>) => void;
 }
 
@@ -269,7 +269,7 @@ export function createExecutionRuntime<TContext, TData>(
     const feedbackQuery = originFrame.query;
     const feedbackKey = originFrame.queryKey;
 
-    dependencies.onExecutionStart();
+    dependencies.onExecutionStart(originFrame);
     running.set(executionId, task);
     executions.set(
       executionId,

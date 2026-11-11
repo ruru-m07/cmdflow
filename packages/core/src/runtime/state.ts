@@ -12,7 +12,7 @@ import type {
   CmdFlowResolvedItem as ResolvedItem,
   CmdFlowSourceSnapshot as SourceSnapshot,
 } from "../contracts/snapshots.js";
-import type { RankExplanation, RankingQueryKey } from "../ranking-types.js";
+import type { RankExplanation, RankingProfile, RankingQueryKey } from "../ranking-types.js";
 
 export interface SourceState<TContext, TData = unknown> {
   definition: ResultSource<TContext, TData>;
@@ -53,6 +53,9 @@ export interface Frame<TContext, TData = unknown> {
   queryKey?: RankingQueryKey;
   queryKeyGeneration: number;
   rankExplanations: readonly RankExplanation[];
+  rankingProfile?: RankingProfile;
+  deferredRankingProfile?: RankingProfile;
+  rankingLocked: boolean;
 }
 
 export interface RunningExecution<TContext, TData = unknown> {

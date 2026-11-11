@@ -3,7 +3,7 @@ import type { CandidateId } from "../contracts/primitives.js";
 import type { CmdFlowResolvedItem as ResolvedItem } from "../contracts/snapshots.js";
 import { createCandidateId, immutable } from "../identity.js";
 import { rankItems } from "../ranking.js";
-import type { RankingProfile, RankingScope } from "../ranking-types.js";
+import type { RankingScope } from "../ranking-types.js";
 import type { ActionResolver } from "./action-resolver.js";
 import { createViewSnapshot } from "./frame.js";
 import type { Frame } from "./state.js";
@@ -13,7 +13,6 @@ interface FrameProjectorOptions<TContext, TData> {
   actions: ActionResolver<TContext, TData>;
   commands(): Iterable<CommandDefinition<TContext, TData>>;
   scope(frame: Frame<TContext, TData>): RankingScope;
-  profile(scope: RankingScope): RankingProfile | undefined;
   now(): number;
   diagnostic(type: string, id?: string, detail?: string): void;
 }
@@ -118,7 +117,7 @@ export class FrameProjector<TContext, TData = unknown> {
     const ranked = rankItems(resolved, {
       query: frame.query,
       scope,
-      profile: this.options.profile(scope),
+      profile: frame.rankingProfile,
       now: this.options.now(),
       queryKey: frame.queryKey,
     });
