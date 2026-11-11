@@ -9,9 +9,8 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "test": "turbo run test",
-    "test:packages": "bun scripts/check-packages.ts",
     "bench": "bun packages/core/benchmarks/navigation.ts",
-    "check-types": "turbo run check-types",
+    "check-types": "turbo run check-types && tsc --project scripts/tsconfig.json",
     "tegami": "bun scripts/tegami.mts"
   },
   "devDependencies": {
