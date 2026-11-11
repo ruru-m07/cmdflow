@@ -3,6 +3,7 @@ import type { DomEffects } from "./effects.js";
 import type { ElementRegistry } from "./element-registry.js";
 import { eventTarget, isEditableElement, isHtmlElement, trapTabFocus } from "./focus.js";
 import type { DomIds } from "./ids.js";
+import { type ListDirection, pageTarget, sectionTarget } from "./list-navigation.js";
 import type { Address, Cleanup, DomControllerOptions } from "./types.js";
 
 export function isApplePlatform(document: Document): boolean {
@@ -35,6 +36,23 @@ export function describeKeybinding(binding: CmdFlowKeybinding, apple = false): s
   ]
     .filter(Boolean)
     .join("+");
+}
+
+function listNavigation(
+  event: KeyboardEvent,
+  apple: boolean,
+): { kind: "item" | "page" | "section"; direction: ListDirection } | undefined {
+  if (apple && matchesKeybinding(event, { key: "n", ctrl: true }))
+    return { kind: "item", direction: 1 };
+  if (apple && matchesKeybinding(event, { key: "p", ctrl: true }))
+    return { kind: "item", direction: -1 };
+
+  const key = event.key;
+  if (key !== "ArrowDown" && key !== "ArrowUp") return;
+  const direction = key === "ArrowDown" ? 1 : -1;
+  if (matchesKeybinding(event, { key })) return { kind: "item", direction };
+  if (matchesKeybinding(event, { key, alt: true })) return { kind: "page", direction };
+  if (matchesKeybinding(event, { key, mod: true }, apple)) return { kind: "section", direction };
 }
 
 interface GlobalShortcut {
@@ -135,8 +153,11 @@ export function createKeyboardController<TContext, TData>({
     const address = eventAddress(event);
     const frame = ids.frame(address);
     const target = eventTarget(event);
-    const search = elements.inputs.get(ids.addressKey(address)) === target;
-    const apple = elements.dialog ? isApplePlatform(elements.dialog.ownerDocument) : false;
+    const addressKey = ids.addressKey(address);
+    const input = elements.inputs.get(addressKey);
+    const search = input === target;
+    const document = elements.dialog?.ownerDocument ?? input?.ownerDocument;
+    const apple = document ? isApplePlatform(document) : false;
     const bare = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
     if (event.key === "Escape" && bare) {
       event.preventDefault();
@@ -160,10 +181,21 @@ export function createKeyboardController<TContext, TData>({
       }
       return;
     }
-    if (search && bare && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    const navigation = search && frame ? listNavigation(event, apple) : undefined;
+    if (navigation && frame) {
       effects.setModality("keyboard");
       event.preventDefault();
-      flow.moveActive(event.key === "ArrowDown" ? "next" : "previous", address);
+      if (navigation.kind === "item") {
+        flow.moveActive(navigation.direction === 1 ? "next" : "previous", address);
+      } else {
+        const candidateId =
+          navigation.kind === "page"
+            ? pageTarget(frame, navigation.direction, elements.lists.get(addressKey), (id) =>
+                elements.items.get(ids.itemKey(id, address)),
+              )
+            : sectionTarget(frame, navigation.direction);
+        if (candidateId !== undefined) flow.setActive(candidateId, address);
+      }
       return;
     }
     if (

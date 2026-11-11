@@ -201,17 +201,12 @@ export function createNativeController<TContext, TData>({
     elements.lists.set(mapKey, element);
     if (mode === "props") syncActiveDescendant(address);
     const unlisten = listen(element, "scroll", () => {
-      const frame = ids.frame(address);
-      const active = frame?.activeId;
-      const option = active ? elements.items.get(ids.itemKey(active, address)) : undefined;
-      if (active && option)
-        flow.setScrollAnchor(
-          {
-            candidateId: active,
-            offset: option.getBoundingClientRect().top - element.getBoundingClientRect().top,
-          },
-          address,
-        );
+      const snapshot = flow.getSnapshot();
+      const frame = snapshot.activeFrame;
+      if (!snapshot.open || frame.id !== address.frameId || elements.lists.get(mapKey) !== element)
+        return;
+      const anchor = effects.rememberScroll(frame);
+      if (anchor) flow.setScrollAnchor(anchor, address);
     });
     return cleanup(() => {
       unlisten();

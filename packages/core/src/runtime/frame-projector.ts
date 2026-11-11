@@ -121,18 +121,38 @@ export class FrameProjector<TContext, TData = unknown> {
       now: this.options.now(),
       queryKey: frame.queryKey,
     });
-    frame.rankExplanations = ranked.explanations;
+    let items = ranked.items;
+    let explanations = ranked.explanations;
+    if (frame.rankingLocked && frame.snapshot.items.length) {
+      // Keep the rows already presented in place. Source arrivals can add rows, and
+      // removed or newly ineligible rows must disappear even during navigation.
+      const remaining = new Map(items.map((item) => [item.candidateId, item]));
+      const retained = frame.snapshot.items.flatMap(({ candidateId }) => {
+        const item = remaining.get(candidateId);
+        remaining.delete(candidateId);
+        return item ? [item] : [];
+      });
+      items = [...retained, ...remaining.values()];
+      if (items.some((item, index) => item !== ranked.items[index])) {
+        const order = new Map<string, number>(
+          items.map(({ candidateId }, index) => [candidateId, index]),
+        );
+        explanations = explanations
+          .map((entry) => ({ ...entry, finalOrder: order.get(entry.candidateId) ?? -1 }))
+          .sort((a, b) => Number(b.eligible) - Number(a.eligible) || a.finalOrder - b.finalOrder);
+      }
+    }
+    frame.rankExplanations = explanations;
     frame.candidates = candidates;
     const previousIndex = frame.snapshot.items.findIndex(
       (entry) => entry.candidateId === frame.activeId,
     );
-    if (!ranked.items.some((entry) => entry.candidateId === frame.activeId)) {
+    if (!items.some((entry) => entry.candidateId === frame.activeId)) {
       frame.activeId =
-        ranked.items[Math.max(0, Math.min(previousIndex, ranked.items.length - 1))]?.candidateId ??
-        null;
+        items[Math.max(0, Math.min(previousIndex, items.length - 1))]?.candidateId ?? null;
     }
     frame.selectedIds = frame.selectedIds.filter((entry) =>
-      ranked.items.some((item) => item.candidateId === entry),
+      items.some((item) => item.candidateId === entry),
     );
     const active = frame.activeId ? candidates.get(frame.activeId) : undefined;
     const definitions = active
@@ -146,7 +166,7 @@ export class FrameProjector<TContext, TData = unknown> {
       composing: frame.composing,
       activeId: frame.activeId,
       selectedIds: frame.selectedIds,
-      items: ranked.items,
+      items,
       sources: [...frame.sources.values()].map((state) => state.snapshot),
       actions: [],
       scrollAnchor: frame.scrollAnchor,

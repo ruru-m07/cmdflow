@@ -88,8 +88,13 @@ for the complete contract.
 
 ### 3. Open it
 
-The trigger opens the dialog. The search input retains DOM focus while Up and Down change the active
-command. Enter runs its primary `action`. Escape closes the active surface.
+The trigger opens the dialog. Search keeps keyboard focus while ↑ and ↓ move through the results
+and stop at the ends. Option+↑/↓ (Alt+↑/↓) moves one page; ⌘+↑/↓ (Ctrl+↑/↓ elsewhere) jumps between
+sections. Ctrl+P/N also moves one row on macOS. Enter runs the active command's primary action.
+Escape returns from a child view with the previous query, result order, active row, and scroll
+position. At the root it clears a nonempty query or closes the dialog when the query is empty.
+With an Action Panel mounted, ⌘K on macOS (Ctrl+K elsewhere) opens its own search. Escape or the same
+shortcut closes the panel and restores focus to the originating control.
 
 ## Solid
 

@@ -20,6 +20,11 @@ export type {
 } from "./types.js";
 export { describeKeybinding, matchesKeybinding };
 
+interface FrameOpener {
+  readonly frameId: string;
+  readonly element: HTMLElement;
+}
+
 /** Lifecycle binding never assumes a flow notification means a framework has committed. */
 export function createDomController<TContext = unknown, TData = unknown>(
   flow: CmdFlow<TContext, TData>,
@@ -32,8 +37,9 @@ export function createDomController<TContext = unknown, TData = unknown>(
   const elements = createElementRegistry();
   const ids = createDomIds(flow, options.id);
   const modal = createModalController();
-  const openers = new Map<string, HTMLElement | null>();
+  const openers = new Map<string, FrameOpener>();
   let shellOpener: HTMLElement | null = null;
+  let confirmationOpener: HTMLElement | null = null;
   let committed: CmdFlowSnapshot | null = null;
   let destroyed = false;
   let announcementKey = "";
@@ -111,38 +117,38 @@ export function createDomController<TContext = unknown, TData = unknown>(
     const closed = !snapshot.open && previous?.open;
     const oldActive = previous?.activeFrame;
     const newActive = snapshot.activeFrame;
+    const frames = [...snapshot.mainFrames, ...snapshot.actionFrames];
+    const previousFrames =
+      newActive.surface === "main" ? previous?.mainFrames : previous?.actionFrames;
+    const previousFrame = previousFrames?.find((frame) => frame.id === newActive.id);
+    const frameChanged = newActive.id !== oldActive?.id;
+    const queryChanged =
+      previousFrame !== undefined &&
+      !newActive.composing &&
+      (newActive.query !== previousFrame.query || previousFrame.composing);
+    const returning = previous?.open === true && frameChanged && previousFrame !== undefined;
+    let shouldScroll =
+      opened || frameChanged || queryChanged || newActive.activeId !== oldActive?.activeId;
     let restoredFrameFocus = false;
     if (opened) shellOpener = root ? getDeepActiveElement(root) : null;
-    if (snapshot.open && newActive.id !== oldActive?.id && !openers.has(newActive.id)) {
-      const requestedActionOpener = props.takeRequestedActionOpener();
-      openers.set(
-        newActive.id,
-        newActive.surface === "actions"
-          ? (requestedActionOpener ?? (root ? getDeepActiveElement(root) : null))
-          : root
-            ? getDeepActiveElement(root)
-            : null,
-      );
+    if (snapshot.open && previous?.open && oldActive && frameChanged && !returning) {
+      const requestedOpener =
+        newActive.surface === "actions" ? props.takeRequestedActionOpener() : null;
+      const opener =
+        requestedOpener ??
+        (oldActive.view.type !== "list" && root ? getDeepActiveElement(root) : null);
+      if (opener) openers.set(newActive.id, { frameId: oldActive.id, element: opener });
     }
     if (mode === "delegate") native.applyAttributes(dialog, props.getDialogProps(snapshot));
     if (elements.confirmation && mode === "delegate")
       native.applyAttributes(elements.confirmation, props.getConfirmationProps(snapshot));
     modal.syncDialog(dialog, snapshot.open);
-    for (const frame of [...snapshot.mainFrames, ...snapshot.actionFrames]) {
+    for (const frame of frames) {
       const address = { surface: frame.surface, frameId: frame.id };
       const addressKey = ids.addressKey(address);
-      const input = elements.inputs.get(addressKey);
-      if (input) {
-        if (mode === "delegate") {
-          native.applyAttributes(input, props.getInputProps(address, snapshot));
-          if (input.value !== frame.query && !keyboard.composing.has(addressKey))
-            input.value = frame.query;
-        } else native.syncActiveDescendant(address, snapshot);
-      }
-      const list = elements.lists.get(addressKey);
-      if (list && mode === "delegate")
-        native.applyAttributes(list, props.getListProps(address, snapshot));
       if (mode === "delegate") {
+        const list = elements.lists.get(addressKey);
+        if (list) native.applyAttributes(list, props.getListProps(address, snapshot));
         const form = elements.forms.get(addressKey);
         if (form) native.applyAttributes(form, props.getFormProps(address, snapshot));
         for (const field of frame.view.fields) {
@@ -158,44 +164,52 @@ export function createDomController<TContext = unknown, TData = unknown>(
           )
             element.value = String(fieldProps.value ?? "");
         }
+        for (const item of frame.items) {
+          const element = elements.items.get(ids.itemKey(item.candidateId, address));
+          if (element)
+            native.applyAttributes(
+              element,
+              props.getItemProps(item.candidateId, address, snapshot),
+            );
+        }
       }
-      for (const item of frame.items) {
-        const element = elements.items.get(ids.itemKey(item.candidateId, address));
-        if (element && mode === "delegate")
-          native.applyAttributes(element, props.getItemProps(item.candidateId, address, snapshot));
+      const input = elements.inputs.get(addressKey);
+      if (input) {
+        if (mode === "delegate") {
+          native.applyAttributes(input, props.getInputProps(address, snapshot));
+          if (input.value !== frame.query && !keyboard.composing.has(addressKey))
+            input.value = frame.query;
+        } else native.syncActiveDescendant(address, snapshot);
       }
     }
     if (opened) effects.focusInitial(newActive);
-    else if (snapshot.open && oldActive && oldActive.id !== newActive.id) {
-      const popping = [...(previous?.mainFrames ?? []), ...(previous?.actionFrames ?? [])].some(
-        (frame) => frame.id === newActive.id,
+    else if (snapshot.open && oldActive && frameChanged) {
+      const departingFrame =
+        oldActive.surface === "actions" && newActive.surface === "main"
+          ? previous?.actionFrames[0]
+          : oldActive;
+      const opener = departingFrame && openers.get(departingFrame.id);
+      restoredFrameFocus = Boolean(
+        returning && opener?.frameId === newActive.id && focusElement(opener.element),
       );
-      restoredFrameFocus = popping && focusElement(openers.get(oldActive.id));
       if (!restoredFrameFocus) effects.focusInitial(newActive);
     }
     if (!snapshot.confirmation) modal.releaseConfirmation();
     if (snapshot.confirmation && snapshot.confirmation.id !== previous?.confirmation?.id) {
-      openers.set(
-        `confirmation:${snapshot.confirmation.id}`,
-        root ? getDeepActiveElement(root) : null,
-      );
+      confirmationOpener = root ? getDeepActiveElement(root) : null;
       if (elements.confirmation) modal.activateConfirmation(elements.confirmation);
       focusElement(elements.confirmation);
     } else if (!snapshot.confirmation && previous?.confirmation) {
-      if (!focusElement(openers.get(`confirmation:${previous.confirmation.id}`)))
-        effects.focusInitial(newActive);
+      if (!frameChanged && !focusElement(confirmationOpener)) effects.focusInitial(newActive);
+      confirmationOpener = null;
     }
     if (closed) {
       if (!focusElement(shellOpener)) focusElement(options.restoreFocus?.());
+      shellOpener = null;
       openers.clear();
       keyboard.clear();
+      props.clear();
       effects.clearStatus();
-    }
-    if (snapshot.open) {
-      const changedActive = newActive.activeId !== oldActive?.activeId;
-      if (changedActive || !effects.restoreScroll(newActive)) {
-        if (changedActive || newActive.id !== oldActive?.id) effects.scrollActive(newActive);
-      }
     }
     committed = snapshot;
     const pendingEffects = flow
@@ -203,14 +217,11 @@ export function createDomController<TContext = unknown, TData = unknown>(
       .filter((effect) => effect.revision <= snapshot.revision);
     const acknowledged: number[] = [];
     for (const effect of pendingEffects) {
-      const frame = [...snapshot.mainFrames, ...snapshot.actionFrames].find(
-        (candidate) => candidate.id === effect.frameId,
-      );
       if (effect.type === "announce") {
         if (snapshot.open && effect.message) effects.announce(effect.message);
         acknowledged.push(effect.id);
       } else if (effect.type === "restore") acknowledged.push(effect.id);
-      else if (!snapshot.open || (effect.frameId && frame?.id !== newActive.id))
+      else if (!snapshot.open || (effect.frameId && effect.frameId !== newActive.id))
         acknowledged.push(effect.id);
       else if (effect.type === "focus") {
         const later = pendingEffects.some(
@@ -220,7 +231,7 @@ export function createDomController<TContext = unknown, TData = unknown>(
           acknowledged.push(effect.id);
           continue;
         }
-        if (restoredFrameFocus && effect.target === "input" && !effect.fieldId) {
+        if (restoredFrameFocus && effect.target !== "confirmation" && !effect.fieldId) {
           acknowledged.push(effect.id);
           continue;
         }
@@ -238,12 +249,17 @@ export function createDomController<TContext = unknown, TData = unknown>(
                   (newActive.view.type !== "list" ? dialog : undefined));
         if (focusElement(target)) acknowledged.push(effect.id);
       } else if (effect.type === "scroll") {
-        const targetFrame = frame ?? newActive;
-        if (targetFrame.activeId !== oldActive?.activeId || !effects.restoreScroll(targetFrame))
-          effects.scrollActive(targetFrame);
+        shouldScroll = true;
         acknowledged.push(effect.id);
       }
       if (snapshot.confirmation && effect.target !== "confirmation") acknowledged.push(effect.id);
+    }
+    if (snapshot.open && shouldScroll) {
+      if (!returning || queryChanged || !effects.restoreScroll(newActive)) {
+        if (opened || frameChanged || queryChanged) effects.resetScroll(newActive);
+        effects.scrollActive(newActive);
+      }
+      effects.rememberScroll(newActive);
     }
     if (acknowledged.length) flow.acknowledgeDomEffects(acknowledged);
     const failed = newActive.sources.filter((source) => source.status === "error").length;
@@ -257,11 +273,9 @@ export function createDomController<TContext = unknown, TData = unknown>(
           options.announcementDelay ?? 120,
         );
     }
-    const liveFrames = new Set(
-      [...snapshot.mainFrames, ...snapshot.actionFrames].map((frame) => frame.id),
-    );
-    for (const frameId of openers.keys())
-      if (!frameId.startsWith("confirmation:") && !liveFrames.has(frameId)) openers.delete(frameId);
+    const liveFrames = new Set(snapshot.open ? frames.map((frame) => frame.id) : []);
+    for (const frameId of openers.keys()) if (!liveFrames.has(frameId)) openers.delete(frameId);
+    effects.retainScroll(liveFrames);
   }
 
   function destroy(): void {
@@ -273,6 +287,7 @@ export function createDomController<TContext = unknown, TData = unknown>(
     props.clear();
     keyboard.clear();
     openers.clear();
+    effects.retainScroll(new Set());
   }
 
   return {

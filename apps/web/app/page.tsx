@@ -29,8 +29,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-svh overflow-x-clip bg-canvas text-foreground selection:bg-foreground selection:text-canvas">     
-
+    <div className="min-h-svh overflow-x-clip bg-canvas text-foreground selection:bg-foreground selection:text-canvas">
       <main id="main-content" className="scroll-mt-6" tabIndex={-1}>
         <section
           className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-20 pb-14 text-center sm:px-6 sm:pt-24 sm:pb-16"
@@ -57,7 +56,6 @@ export default function Home() {
               </button>
             )}
           </div>
-          
         </section>
 
         <section

@@ -77,21 +77,23 @@ export function createPropBindings<TContext, TData>({
   function getInputProps(value: Address = "main", snapshot = flow.getSnapshot()) {
     const frame = ids.frame(value, snapshot);
     const address = ids.address(value, snapshot);
-    const mounted = frame?.activeId
-      ? elements.items.get(ids.itemKey(frame.activeId, address, snapshot))
+    const candidateId = frame?.activeId;
+    const itemId = candidateId ? ids.partId("item", address, candidateId, snapshot) : undefined;
+    const mounted = candidateId
+      ? elements.items.get(ids.itemKey(candidateId, address, snapshot))
       : undefined;
     const input = elements.inputs.get(ids.addressKey(address));
     const list = elements.lists.get(ids.addressKey(address));
+    const listId = ids.partId("list", address, "", snapshot);
     const dialog = elements.dialog;
     const referenceValid =
       mounted?.isConnected &&
+      mounted.id === itemId &&
       list?.isConnected &&
+      list.id === listId &&
       list.contains(mounted) &&
       (!input || input.getRootNode() === mounted.getRootNode()) &&
       (!dialog || !isNativeDialog(dialog) || dialog.contains(mounted));
-    const activeId = referenceValid
-      ? ids.partId("item", address, frame?.activeId ?? "", snapshot)
-      : undefined;
     return {
       id: ids.partId("input", address, "", snapshot),
       "data-cmdflow-part": "input" as const,
@@ -108,8 +110,8 @@ export function createPropBindings<TContext, TData>({
           : (options.searchLabel ?? "Search commands"),
       "aria-autocomplete": "list" as const,
       "aria-expanded": snapshot.open && frame !== undefined,
-      "aria-controls": ids.partId("list", address, "", snapshot),
-      "aria-activedescendant": activeId,
+      "aria-controls": listId,
+      "aria-activedescendant": snapshot.open && referenceValid ? itemId : undefined,
       value: frame?.query ?? "",
       onInput: (event: Event) => keyboard.handleInput(event, address),
       onCompositionStart: (event: Event) => keyboard.handleCompositionStart(event, address),
@@ -151,7 +153,9 @@ export function createPropBindings<TContext, TData>({
       "aria-disabled": item?.disabled ? (true as const) : undefined,
       "aria-description": item?.disabledReason,
       "aria-selected":
-        frame?.view.selectionMode !== "none" ? frame?.selectedIds.includes(id) : undefined,
+        frame?.view.selectionMode === "none"
+          ? frame.activeId === id
+          : frame?.selectedIds.includes(id),
       "aria-posinset": index >= 0 ? index + 1 : undefined,
       "aria-setsize": frame?.sources.some(
         (source) => source.status === "loading" || source.nextCursor !== undefined,

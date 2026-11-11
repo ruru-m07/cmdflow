@@ -390,7 +390,10 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
     frame.query = query;
     frame.composing = composing;
     if (!composing) frame.committedQuery = query;
-    if (committed) frame.activeId = null;
+    if (committed) {
+      frame.activeId = null;
+      frame.scrollAnchor = null;
+    }
     if (frame.surface === "main" && actions.length) closeActionStack();
     if (!composing) {
       releaseRanking([frame]);
@@ -627,8 +630,8 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
           : direction === "last"
             ? items.length - 1
             : direction === "next"
-              ? (index + 1) % items.length
-              : (index - 1 + items.length) % items.length;
+              ? Math.min(index + 1, items.length - 1)
+              : Math.max(index - 1, 0);
       const item = items[next];
       if (item) api.setActive(item.candidateId, { surface: frame.surface, frameId: frame.id });
     },
@@ -640,9 +643,9 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         !frame.snapshot.items.some((item) => item.candidateId === candidateId)
       )
         return;
+      frame.rankingLocked = true;
       if (frame.activeId === candidateId) return;
       frame.activeId = candidateId;
-      frame.rankingLocked = true;
       effect("scroll", { frameId: frame.id });
       publishInteraction(frame);
     },
@@ -726,8 +729,15 @@ export function createCmdFlowRuntime<T = Record<string, never>, TData = unknown>
         popFrame("main");
         return;
       }
-      if (current().query) api.setQuery("");
-      else api.close();
+      const frame = current();
+      if (!frame.query) {
+        api.close();
+        return;
+      }
+      const beforeQueryChange = revision;
+      effect("focus", { frameId: frame.id, target: "input" });
+      api.setQuery("");
+      if (revision === beforeQueryChange) publish(false);
     },
     async invoke(invocation = {}) {
       const frame = find(invocation.address);
