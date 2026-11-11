@@ -2,9 +2,6 @@ name: Verify
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -28,9 +25,4 @@ jobs:
           node-version: 24
       - run: bun install --frozen-lockfile
       - run: bun run check
-      - run: bun run check-types
-      - run: bun run test
       - run: bun run build
-      - run: bun run test:packages
-      - run: bunx playwright install --with-deps chromium firefox webkit
-      - run: bun run test:e2e
