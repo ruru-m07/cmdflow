@@ -120,6 +120,7 @@ export function createNativeController<TContext, TData>({
       for (const eventName of ["click", "pointermove", "pointerdown"]) {
         removals.push(
           listen(element, eventName, (event) => {
+            if (eventName === "click") props.handleDialogClick(event);
             for (const target of event.composedPath()) {
               if (!isHtmlElement(target)) continue;
               const id = target.getAttribute("data-cmdflow-id") as CandidateId | null;

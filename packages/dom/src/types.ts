@@ -35,6 +35,7 @@ interface DialogProps {
   readonly role: "dialog";
   readonly "aria-modal": true | undefined;
   readonly tabIndex: -1;
+  readonly onClick: (event: Event) => void;
   readonly onKeyDown: (event: KeyboardEvent) => void;
 }
 
