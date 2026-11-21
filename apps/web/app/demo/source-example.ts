@@ -2,10 +2,10 @@ export const MINIMAL_REACT_SOURCE = `"use client";
 
 import {
   Command,
-  type CmdFlowCommandDefinition,
+  defineCommands,
 } from "@cmdflow/react";
 
-const commands = [
+const commands = defineCommands([
   {
     id: "settings.open",
     title: "Open settings",
@@ -16,7 +16,7 @@ const commands = [
       run: () => window.location.assign("/settings"),
     },
   },
-] satisfies readonly CmdFlowCommandDefinition[];
+]);
 
 export function CommandPalette() {
   return (

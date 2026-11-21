@@ -20,6 +20,7 @@ export type {
   CmdFlowFinalResultBatch,
   CmdFlowFormField,
   CmdFlowFormSnapshot,
+  CmdFlowFormSubmitSnapshot,
   CmdFlowFormValues,
   CmdFlowFrameSnapshot,
   CmdFlowInvokeOptions,
@@ -36,12 +37,18 @@ export type {
   CmdFlowSurfaceAddress,
   CmdFlowViewDefinition,
   CmdFlowViewSnapshot,
+  InferCmdFlowFormValues,
+  TypedFormViewDefinition,
 } from "@cmdflow/core";
 export {
   createCmdFlow,
+  createDefinitions,
   defineAction,
   defineCommand,
+  defineCommands,
   defineExtension,
+  defineForm,
+  defineSource,
   defineView,
 } from "@cmdflow/core";
 export type { DomControllerOptions } from "@cmdflow/dom";
@@ -53,4 +60,10 @@ export type { ElementProps } from "./merge-props.js";
 export { composeRefs, mergeProps } from "./merge-props.js";
 export * from "./primitives/index.js";
 export type { PrimitiveRender } from "./render.js";
-export { useCmdFlow, useCmdFlowSelector, useCmdflow, useCommandFrame } from "./selectors.js";
+export {
+  useActiveItem,
+  useCmdFlow,
+  useCmdFlowSelector,
+  useCmdflow,
+  useCommandFrame,
+} from "./selectors.js";

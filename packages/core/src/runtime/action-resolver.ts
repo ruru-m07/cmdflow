@@ -22,7 +22,7 @@ export class ActionResolver<TContext, TData = unknown> {
   definitions(
     command: CommandDefinition<TContext, TData>,
   ): readonly ActionDefinition<TContext, TData>[] {
-    return command.actions ?? (command.action ? [command.action] : []);
+    return command.action ? [command.action, ...(command.actions ?? [])] : (command.actions ?? []);
   }
 
   evaluate(
