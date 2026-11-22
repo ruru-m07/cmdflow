@@ -1,5 +1,19 @@
 import type { CmdFlowActionDefinition, CmdFlowCommandDefinition } from "@cmdflow/react";
+import {
+  Bell,
+  BookOpen,
+  CircleDot,
+  Clipboard,
+  FolderGit2,
+  GitPullRequest,
+  type LucideIcon,
+  MessageCircle,
+  Moon,
+  Power,
+  Smile,
+} from "lucide-react";
 import { github } from "./definitions";
+import { registerCommandIcon } from "./icons";
 import type { GithubContext, GithubItemData, GithubItemKind } from "./types";
 import { createPullRequestView, pullRequestListView } from "./views";
 
@@ -11,7 +25,7 @@ interface ExampleCommand {
   readonly subtitle: string;
   readonly section: string;
   readonly kind?: Exclude<GithubItemKind, "pull-request">;
-  readonly icon?: string;
+  readonly icon?: string | LucideIcon;
   readonly primary?: CmdFlowActionDefinition<GithubContext, GithubItemData>;
 }
 
@@ -81,7 +95,11 @@ function exampleCommand({
     section,
     keywords: [section.toLowerCase(), kind],
     aliases: [title],
-    data: { kind, icon, accessory: kind === "quicklink" ? "Quicklink" : kind },
+    data: {
+      kind,
+      icon: typeof icon === "string" ? icon : registerCommandIcon(id, icon),
+      accessory: kind === "quicklink" ? "Quicklink" : kind,
+    },
     action,
     actions: contextualActions(id),
   };
@@ -93,21 +111,21 @@ const commandDefinitions = [
     title: "Paste Recent Screenshot",
     subtitle: "Screenshots",
     section: "Favorites",
-    icon: "▣",
+    icon: Clipboard,
   }),
   exampleCommand({
     id: "toggle-appearance",
     title: "Toggle System Appearance",
     subtitle: "System",
     section: "Favorites",
-    icon: "◐",
+    icon: Moon,
   }),
   exampleCommand({
     id: "shut-down",
     title: "Shut Down",
     subtitle: "System",
     section: "Suggestions",
-    icon: "⏻",
+    icon: Power,
     primary: {
       type: "run",
       id: "shut-down",
@@ -123,21 +141,21 @@ const commandDefinitions = [
     subtitle: "Messaging",
     section: "Suggestions",
     kind: "application",
-    icon: "◉",
+    icon: MessageCircle,
   }),
   exampleCommand({
     id: "emoji",
     title: "Search Emoji & Symbols",
     subtitle: "Raycast",
     section: "Suggestions",
-    icon: "☺",
+    icon: Smile,
   }),
   exampleCommand({
     id: "create",
     title: "Create Pull Request",
     subtitle: "GitHub",
     section: "Suggestions",
-    icon: "↗",
+    icon: GitPullRequest,
     primary: {
       type: "view",
       id: "open",
@@ -149,10 +167,10 @@ const commandDefinitions = [
   }),
   exampleCommand({
     id: "pulls",
-    title: "GitHub · My Pull Requests",
+    title: "My Pull Requests",
     subtitle: "Browse Pull Requests",
     section: "GitHub",
-    icon: "↗",
+    icon: GitPullRequest,
     primary: {
       type: "view",
       id: "open",
@@ -164,17 +182,17 @@ const commandDefinitions = [
   }),
   exampleCommand({
     id: "issues",
-    title: "GitHub · My Issues",
+    title: "My Issues",
     subtitle: "Assigned to You",
     section: "GitHub",
-    icon: "◌",
+    icon: CircleDot,
   }),
   exampleCommand({
     id: "notifications",
-    title: "GitHub · Notifications",
+    title: "Notifications",
     subtitle: "Recent Activity",
     section: "GitHub",
-    icon: "◉",
+    icon: Bell,
   }),
   exampleCommand({
     id: "docs",
@@ -182,7 +200,7 @@ const commandDefinitions = [
     subtitle: "cmdflow.dev",
     section: "Quicklinks",
     kind: "quicklink",
-    icon: "↗",
+    icon: BookOpen,
   }),
   exampleCommand({
     id: "repos",
@@ -190,7 +208,7 @@ const commandDefinitions = [
     subtitle: "Recently Visited",
     section: "Quicklinks",
     kind: "quicklink",
-    icon: "□",
+    icon: FolderGit2,
   }),
 ] satisfies readonly GithubCommand[];
 

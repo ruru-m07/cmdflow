@@ -13,6 +13,9 @@ import { Confirmation } from "./confirmation";
 import { DetailView } from "./detail-view";
 import { FormView } from "./form-view";
 import { ListView, type ListViewContext } from "./list-view";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 
 export interface PaletteFooterContext<TData> extends ListViewContext<TData> {
   readonly primaryAction: CmdFlowActionSnapshot | undefined;
@@ -20,9 +23,13 @@ export interface PaletteFooterContext<TData> extends ListViewContext<TData> {
 }
 
 export interface CommandPaletteProps<TData = unknown> {
-  readonly renderListAnnotation?: (context: ListViewContext<TData>) => ReactNode;
+  readonly renderListAnnotation?: (
+    context: ListViewContext<TData>,
+  ) => ReactNode;
   readonly renderItemIcon?: (item: CmdFlowResolvedItem<TData>) => ReactNode;
-  readonly renderItemAccessory?: (item: CmdFlowResolvedItem<TData>) => ReactNode;
+  readonly renderItemAccessory?: (
+    item: CmdFlowResolvedItem<TData>,
+  ) => ReactNode;
   readonly renderFooter?: (context: PaletteFooterContext<TData>) => ReactNode;
 }
 
@@ -68,24 +75,33 @@ function DefaultFooter({
   rankingReady,
 }: Pick<PaletteFooterContext<unknown>, "primaryAction" | "rankingReady">) {
   return (
-    <footer className="flex min-h-11 items-center justify-end gap-3 rounded-b-lg border-t border-border bg-panel px-2.5 text-[0.625rem] text-muted-foreground sm:justify-between sm:px-3">
-      <span className="hidden sm:inline">
+    <footer className="flex py-1 items-center justify-end gap-3 border-t px-(--panel-x-min-gutter) text-[0.625rem] text-muted-foreground sm:justify-between">
+      {/* <span className="hidden sm:inline">
         {rankingReady ? "Preferences stay local" : "Loading preferences…"}
-      </span>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="max-w-32 truncate text-foreground">
-          {primaryAction?.title ?? "Navigate"}
-        </span>
-        <kbd className="rounded border border-border-strong bg-panel px-1.5 py-0.5 font-mono text-[0.5625rem] text-foreground">
-          ↵
-        </kbd>
-        <Command.Separator className="mx-1 h-4 border-l border-border-strong" />
-        <Command.ActionPanelTrigger className="inline-flex min-h-9 touch-manipulation items-center gap-2 rounded-md px-2 text-foreground transition-[transform,background-color,color] duration-100 hover:bg-panel-raised active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground motion-reduce:transform-none motion-reduce:transition-none [@media(pointer:coarse)]:min-h-11">
-          Actions
-          <kbd className="rounded border border-border-strong bg-panel px-1.5 py-0.5 font-mono text-[0.5625rem] text-foreground [@media(pointer:coarse)]:hidden">
-            ⌘&nbsp;K
-          </kbd>
-        </Command.ActionPanelTrigger>
+      </span> */}
+      <div></div>
+      <div className="flex min-w-0 items-center gap-1">
+        <Button
+          render={<Command.ActionPanelTrigger />}
+          variant="ghost"
+          size="sm"
+        >
+          <span className="text-sm text-muted-foreground">
+            {primaryAction?.title ?? "Navigate"}
+          </span>
+          <Kbd>↵</Kbd>
+        </Button>
+
+        <Command.Separator className="h-4 w-px bg-border" />
+
+        <Button
+          render={<Command.ActionPanelTrigger />}
+          variant="ghost"
+          size="sm"
+        >
+          <span className="text-sm text-muted-foreground">Actions</span>
+          <Kbd>⌘&nbsp;K</Kbd>
+        </Button>
       </div>
     </footer>
   );
@@ -107,13 +123,25 @@ export function CommandPalette<TData = unknown>({
       ? (execution.error ?? "The action could not be completed.")
       : null;
   });
-  const primaryAction = frame.actions.find((action) => action.priority === "primary");
-  const activeItem = frame.items.find((item) => item.candidateId === frame.activeId) ?? null;
-  const footer = renderFooter?.({ frame, activeItem, primaryAction, rankingReady });
+  const primaryAction = frame.actions.find(
+    (action) => action.priority === "primary",
+  );
+  const activeItem =
+    frame.items.find((item) => item.candidateId === frame.activeId) ?? null;
+  const footer = renderFooter?.({
+    frame,
+    activeItem,
+    primaryAction,
+    rankingReady,
+  });
 
   return (
     <Command.Dialog
-      className="fixed top-3 left-1/2 m-0 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-0.75rem)] max-w-[42.5rem] -translate-x-1/2 animate-none overflow-visible rounded-lg border border-border bg-canvas p-0 text-left text-foreground shadow-dialog transition-none backdrop:animate-none backdrop:bg-black/80 backdrop:transition-none sm:top-[10dvh] sm:max-h-[80dvh] sm:w-[calc(100vw-1.75rem)] [&_[hidden]]:hidden"
+      className={cn(
+        "fixed top-3 left-1/2 shadow-sm m-0 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-0.75rem)] max-w-170 -translate-x-1/2 animate-none overflow-visible rounded-xl border border-border bg-canvas p-0 text-left text-foreground transition-none backdrop:animate-none backdrop:bg-foreground/5 backdrop:transition-none sm:top-[10dvh] sm:max-h-[80dvh] sm:w-[calc(100vw-1.75rem)] **:[[hidden]]:hidden",
+        "[--panel-x-min-gutter:--spacing(1.5)]",
+        "[--panel-x-inner-gutter:--spacing(3)]",
+      )}
       aria-label="Command palette"
     >
       <ActiveView
@@ -131,7 +159,12 @@ export function CommandPalette<TData = unknown>({
         </p>
       ) : null}
 
-      {footer ?? <DefaultFooter primaryAction={primaryAction} rankingReady={rankingReady} />}
+      {footer ?? (
+        <DefaultFooter
+          primaryAction={primaryAction}
+          rankingReady={rankingReady}
+        />
+      )}
 
       <ActionPanel />
       <Confirmation />

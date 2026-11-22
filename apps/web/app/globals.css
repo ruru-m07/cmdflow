@@ -177,7 +177,7 @@
   --primary-foreground: var(--color-neutral-50);
   --secondary: --alpha(var(--color-black) / 4%);
   --secondary-foreground: var(--color-neutral-800);
-  --muted: --alpha(var(--color-black) / 4%);
+  --muted: --alpha(var(--color-black) / 8%);
   --muted-foreground: color-mix(
     in srgb,
     var(--color-neutral-500) 90%,

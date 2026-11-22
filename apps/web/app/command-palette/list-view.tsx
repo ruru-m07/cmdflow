@@ -83,7 +83,7 @@ export function ListView<TData>({
 
   return (
     <>
-      <div className="relative flex items-center border-b border-border">
+      <div className="relative flex items-center px-(--panel-x-min-gutter)">
         {depth > 1 ? (
           <Command.Back
             className={`${quietButton} ml-2 shrink-0 border-transparent bg-transparent px-2`}
@@ -93,29 +93,26 @@ export function ListView<TData>({
           </Command.Back>
         ) : null}
         <Command.Input
-          className="min-h-14 min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-base font-medium text-foreground placeholder:text-muted-foreground focus-visible:outline-0 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
+          className="text-sm min-w-0 flex-1 border-0 bg-transparent px-(--panel-x-inner-gutter) py-4 text-foreground placeholder:text-muted-foreground/70 focus-visible:outline-0 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
           aria-label={`Search ${frame.view.title}`}
           name="cmdflow-search"
           autoComplete="off"
           spellCheck={false}
-          placeholder={depth > 1 ? `Search ${frame.view.title.toLowerCase()}…` : "Search commands…"}
+          placeholder={depth > 1 ? `Search ${frame.view.title.toLowerCase()}…` : "Type a command or search…"}
         />
       </div>
 
       {annotation}
 
-      <Command.List className="max-h-[min(45dvh,24rem)] scroll-py-1.5 overflow-y-auto overscroll-contain px-1.5 pb-1.5">
+      <Command.List className="max-h-[min(45dvh,24rem)] scroll-py-15 overflow-y-auto overscroll-contain px-(--panel-x-min-gutter) pb-1.5">
         {sections.map((section) => (
           <Command.Group
             key={section.items[0]?.candidateId ?? section.key}
             label={section.key}
             forceMount
           >
-            <div className="flex h-8 items-center justify-between gap-4 px-1.5 font-mono text-[0.625rem] tracking-[0.12em] text-muted-foreground uppercase">
+            <div className="flex h-8 items-center justify-between gap-4 px-(--panel-x-inner-gutter) text-xs text-muted-foreground">
               <span>{section.label}</span>
-              <span className="tabular-nums">
-                {section.items.length} Result{section.items.length === 1 ? "" : "s"}
-              </span>
             </div>
             {section.items.map((item) => (
               <ResultItem

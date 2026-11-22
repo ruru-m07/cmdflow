@@ -2,6 +2,7 @@ export type GithubItemKind = "application" | "command" | "quicklink" | "pull-req
 
 export interface GithubItemData {
   readonly kind: GithubItemKind;
+  /** Glyph, or an id registered with `registerCommandIcon`. The snapshot cannot hold a component. */
   readonly icon: string;
   readonly accessory: string;
   readonly number?: number;

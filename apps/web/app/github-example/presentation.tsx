@@ -2,6 +2,7 @@
 
 import type { CmdFlowResolvedItem } from "@cmdflow/react";
 import type { ListViewContext } from "../command-palette/list-view";
+import { commandIcon } from "./icons";
 import type { GithubItemData } from "./types";
 
 function calculate(query: string): { readonly expression: string; readonly result: string } | null {
@@ -29,7 +30,10 @@ function calculate(query: string): { readonly expression: string; readonly resul
 }
 
 export function renderGithubIcon(item: CmdFlowResolvedItem<GithubItemData>) {
-  return item.data?.icon ?? "⌘";
+  const icon = item.data?.icon;
+  const Icon = commandIcon(icon);
+  if (Icon) return <Icon size={16} strokeWidth={1.75} />;
+  return icon ?? "⌘";
 }
 
 export function renderGithubAccessory(item: CmdFlowResolvedItem<GithubItemData>) {

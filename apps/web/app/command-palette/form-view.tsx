@@ -1,13 +1,24 @@
 "use client";
 
-import { type CmdFlowViewSnapshot, Command, useCmdFlowSelector } from "@cmdflow/react";
+import {
+  type CmdFlowViewSnapshot,
+  Command,
+  useCmdFlowSelector,
+} from "@cmdflow/react";
 import { fieldControl, primaryButton, quietButton } from "./styles";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type FormField = CmdFlowViewSnapshot["fields"][number];
 
 function FieldControl({ field }: { readonly field: FormField }) {
   if (field.type === "textarea") {
-    return <Command.Textarea className={`${fieldControl} min-h-24 resize-y`} fieldId={field.id} />;
+    return (
+      <Command.Textarea
+        className={`${fieldControl} min-h-24 resize-y`}
+        fieldId={field.id}
+      />
+    );
   }
   if (field.type === "select" || field.type === "multi-select") {
     return <Command.Select className={fieldControl} fieldId={field.id} />;
@@ -33,10 +44,7 @@ function FormField({ field }: { readonly field: FormField }) {
 
   return (
     <div className="space-y-1.5">
-      <Command.FieldLabel
-        className="block text-xs font-medium text-foreground"
-        fieldId={field.id}
-      />
+      <Label render={<Command.FieldLabel fieldId={field.id} />}></Label>
       <FieldControl field={field} />
       <Command.FieldError
         className="font-medium text-xs leading-5 text-foreground"
@@ -68,8 +76,14 @@ export function FormView() {
 
       <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
         <Command.Back className={quietButton}>Cancel</Command.Back>
-        <button className={primaryButton} type="submit" disabled={frame.form.submitting}>
-          {frame.form.submitting ? "Submitting…" : (frame.view.submit?.title ?? "Submit")}
+        <button
+          className={primaryButton}
+          type="submit"
+          disabled={frame.form.submitting}
+        >
+          {frame.form.submitting
+            ? "Submitting…"
+            : (frame.view.submit?.title ?? "Submit")}
         </button>
       </div>
     </Command.Form>

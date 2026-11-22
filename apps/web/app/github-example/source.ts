@@ -1,7 +1,11 @@
 import type { CmdFlowResultSource } from "@cmdflow/react";
+import { GitPullRequest } from "lucide-react";
 import { github } from "./definitions";
+import { registerCommandIcon } from "./icons";
 import type { GithubContext, GithubItemData } from "./types";
 import { createPullRequestDetailView } from "./views";
+
+const pullRequestIcon = registerCommandIcon("pull-request", GitPullRequest);
 
 const pullRequests = [
   "Preserve Search When Navigating Back",
@@ -54,7 +58,7 @@ export const pullRequestSource = github.source({
         providerRank,
         data: {
           kind: "pull-request" as const,
-          icon: "↗",
+          icon: pullRequestIcon,
           accessory: "Pull Request",
           number,
         },
