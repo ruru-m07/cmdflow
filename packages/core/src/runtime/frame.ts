@@ -16,6 +16,10 @@ export function createViewSnapshot<TContext, TData>(
     renderer: definition.renderer,
     selectionMode: definition.selectionMode ?? "none",
     fields: (definition.fields ?? []).map(({ validate: _validate, ...field }) => field),
+    submit:
+      definition.type === "form"
+        ? { id: definition.submit.id, title: definition.submit.title }
+        : undefined,
   });
 }
 

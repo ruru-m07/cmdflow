@@ -14,6 +14,7 @@ import { isNativeDialog } from "./modal.js";
 import type { Address, DomControllerOptions, DomPropBindings, InputElement } from "./types.js";
 
 export interface PropBindingsController extends DomPropBindings {
+  handleDialogClick(event: Event): void;
   handleItemClick(event: Event, id: CandidateId, address: Address): void;
   handleItemPointerMove(event: PointerEvent, id: CandidateId, address: Address): void;
   handleItemPointerDown(event: PointerEvent): void;
@@ -43,6 +44,20 @@ export function createPropBindings<TContext, TData>({
   let pointer: { x: number; y: number } | null = null;
   let requestedActionOpener: HTMLElement | null = null;
 
+  function handleDialogClick(event: Event): void {
+    const dialog = elements.dialog;
+    if (event.defaultPrevented || event.target !== dialog || !dialog || !isNativeDialog(dialog))
+      return;
+    const { clientX, clientY } = event as MouseEvent;
+    const bounds = dialog.getBoundingClientRect();
+    const clickedBackdrop =
+      clientX < bounds.left ||
+      clientX > bounds.right ||
+      clientY < bounds.top ||
+      clientY > bounds.bottom;
+    if (clickedBackdrop) flow.close();
+  }
+
   function handleItemClick(event: Event, id: CandidateId, value: Address): void {
     if (event.defaultPrevented || keyboard.composing.size || ids.frame(value)?.composing) return;
     flow.setActive(id, ids.address(value));
@@ -70,6 +85,7 @@ export function createPropBindings<TContext, TData>({
       role: "dialog" as const,
       "aria-modal": snapshot.open ? (true as const) : undefined,
       tabIndex: -1 as const,
+      onClick: handleDialogClick,
       onKeyDown: keyboard.handleKeyDown,
     };
   }
@@ -326,6 +342,7 @@ export function createPropBindings<TContext, TData>({
     getFieldErrorProps,
     getStatusProps,
     getConfirmationProps,
+    handleDialogClick,
     handleItemClick,
     handleItemPointerMove,
     handleItemPointerDown,

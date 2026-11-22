@@ -112,6 +112,18 @@ export function useCommandFrame<TData = unknown>(
   );
 }
 
+/** Returns the active result for a surface, or `null` when the frame has no active row. */
+export function useActiveItem<TData = unknown>(
+  surface?: CmdFlowSurface,
+): CmdFlowResolvedItem<TData> | null {
+  const resolvedSurface = useSurface(surface);
+  return useCmdFlowSelector<CmdFlowResolvedItem<TData> | null, unknown, TData>((snapshot) => {
+    const frame = frameFor(snapshot, resolvedSurface);
+    if (!frame?.activeId) return null;
+    return frame.items.find((item) => item.candidateId === frame.activeId) ?? null;
+  });
+}
+
 export interface ItemLookup<TData = unknown> {
   readonly item: CmdFlowResolvedItem<TData>;
   readonly index: number;

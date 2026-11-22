@@ -82,8 +82,12 @@ export function createDomEffects(
       if (!viewport?.isConnected || !active || !viewport.contains(active)) return;
       const box = viewport.getBoundingClientRect();
       const row = active.getBoundingClientRect();
-      if (row.top < box.top) viewport.scrollTop += row.top - box.top;
-      else if (row.bottom > box.bottom) viewport.scrollTop += row.bottom - box.bottom;
+      const style = active.ownerDocument.defaultView?.getComputedStyle(active);
+      const marginTop = Number.parseFloat(style?.scrollMarginTop ?? "") || 0;
+      const marginBottom = Number.parseFloat(style?.scrollMarginBottom ?? "") || 0;
+      if (row.top - marginTop < box.top) viewport.scrollTop += row.top - marginTop - box.top;
+      else if (row.bottom + marginBottom > box.bottom)
+        viewport.scrollTop += row.bottom + marginBottom - box.bottom;
     },
     rememberScroll(frame) {
       const viewport = list(frame);

@@ -9,6 +9,11 @@ type WithoutValidator<TField> = TField extends unknown ? Omit<TField, "validate"
 
 export type CmdFlowFormFieldSnapshot = WithoutValidator<CmdFlowFormField>;
 
+export interface CmdFlowFormSubmitSnapshot {
+  readonly id: string;
+  readonly title: string;
+}
+
 export interface CmdFlowViewSnapshot {
   readonly id: string;
   readonly type: "list" | "detail" | "form" | "custom";
@@ -17,6 +22,7 @@ export interface CmdFlowViewSnapshot {
   readonly renderer?: CmdFlowRendererDescriptor;
   readonly selectionMode: "none" | "single" | "multiple";
   readonly fields: readonly CmdFlowFormFieldSnapshot[];
+  readonly submit?: CmdFlowFormSubmitSnapshot;
 }
 
 export interface CmdFlowActionSnapshot {

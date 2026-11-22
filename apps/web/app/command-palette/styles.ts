@@ -1,0 +1,8 @@
+export const quietButton =
+  "inline-flex min-h-9 touch-manipulation items-center justify-center rounded-md border border-border-strong bg-panel px-3 text-xs font-medium text-foreground transition-[transform,background-color,border-color,color] duration-100 hover:border-foreground/50 hover:bg-panel-raised active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-wait disabled:opacity-60 disabled:active:scale-100 motion-reduce:transform-none motion-reduce:transition-none [@media(pointer:coarse)]:min-h-11";
+
+export const primaryButton =
+  "inline-flex min-h-9 touch-manipulation items-center justify-center rounded-md border border-foreground bg-foreground px-3 text-xs font-semibold text-canvas transition-[transform,background-color,border-color,color] duration-100 hover:bg-foreground/90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-wait disabled:opacity-60 disabled:active:scale-100 motion-reduce:transform-none motion-reduce:transition-none [@media(pointer:coarse)]:min-h-11";
+
+export const fieldControl =
+  "min-h-10 w-full rounded-md border border-border-strong bg-panel px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground hover:border-foreground/50 focus-visible:border-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground aria-[invalid=true]:border-foreground aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-foreground [@media(pointer:coarse)]:min-h-11";
